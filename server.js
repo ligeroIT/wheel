@@ -26,15 +26,19 @@ function generateRandomId(length = 6) {
     return result;
 }
 
-// Funkcja do zapisywania logów audytowych
+// Funkcja pomocnicza do logów
 async function logAudit(gameId, action, description, meta = {}) {
-    const logRef = db.ref(`games/${gameId}/audit`);
-    await logRef.push({
-        action,       // np. "GAME_CREATED", "SPIN_RESULT"
-        description,  // np. "Utworzono grę", "Marek wylosował numer 1"
-        meta,         // Dodatkowe dane (np. kto to zrobił)
-        timestamp: Date.now()
-    });
+    try {
+        const logRef = db.ref(`games/${gameId}/audit`);
+        await logRef.push({
+            action,
+            description,
+            meta,
+            timestamp: Date.now()
+        });
+    } catch (e) {
+        console.error("Błąd logowania audytu:", e);
+    }
 }
 
 async function verifyTokenOptional(req, res, next) {
@@ -180,6 +184,7 @@ app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res)
 // 6. LOSOWANIE (SPIN)
 app.post('/api/spin', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
+
     if (!gameId) return res.status(400).json({ error: "Brak ID gry" });
 
     try {
@@ -191,12 +196,14 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         const config = game.config;
         
         let playerId = null;
-        let playerName = null;
+        let playerName = "Anonim"; // Domyślna wartość
 
+        // 1. USTALAMY TOŻSAMOŚĆ I IMIĘ
         if (config.authType === 'google') {
             if (!req.user) return res.status(401).json({ error: "Wymagane logowanie Google." });
             playerId = req.user.uid;
-            playerName = req.user.name || req.user.email;
+            // Pobieramy imię z Google lub email
+            playerName = req.user.name || req.user.email || "Gracz Google";
         } else if (config.authType === 'email') {
             if (!userData?.email) return res.status(400).json({ error: "Podaj email" });
             playerId = userData.email.replace(/[.#$/[\]]/g, '_');
@@ -204,16 +211,17 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         } else {
             if (!userData?.name) return res.status(400).json({ error: "Podaj imię" });
             playerId = userData.name.toLowerCase().trim();
-            playerName = userData.name;
+            playerName = userData.name; // <--- Tu bierzemy imię z formularza
         }
 
+        // 2. SPRAWDZENIE LIMITÓW
         const userHistory = game.users?.[playerId] || { spinsUsed: 0 };
         if (userHistory.spinsUsed >= config.spinLimit) {
-            // LOG: Próba przekroczenia limitu
             await logAudit(gameId, "SPIN_BLOCKED", `Gracz ${playerName} próbował przekroczyć limit`, { playerId });
             return res.status(403).json({ error: "Limit wykorzystany!", code: "LIMIT_REACHED" });
         }
 
+        // 3. LOSOWANIE
         const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
         const available = allPrizes.filter(p => !p.wonBy);
 
@@ -221,11 +229,14 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         const winnerPrize = available[Math.floor(Math.random() * available.length)];
 
+        // 4. ZAPIS DO BAZY (Fix undefined)
         const updates = {};
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonBy`] = playerId;
-        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByName`] = playerName; // Zapisujemy imię zwycięzcy
-        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonAt`] = Date.now(); // Czas wygranej
+        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByName`] = playerName; // <--- TO JEST KLUCZOWE!
+        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonAt`] = Date.now();
         updates[`games/${gameId}/users/${playerId}/spinsUsed`] = userHistory.spinsUsed + 1;
+        
+        // Animacja
         updates[`games/${gameId}/gameState`] = {
             spinning: true,
             spinnerName: playerName,
@@ -235,12 +246,12 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         await db.ref().update(updates);
 
-        // LOG: Udane losowanie
-        await logAudit(gameId, "SPIN_SUCCESS", `Gracz ${playerName} wylosował nagrodę nr ${winnerPrize.number}`, { 
-            prize: winnerPrize.secret, 
-            playerId 
+        // 5. LOG AUDYTOWY (Żeby tabela nie była pusta)
+        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} wylosował nagrodę nr ${winnerPrize.number}`, { 
+            prize: winnerPrize.secret 
         });
 
+        // Reset animacji po 5s
         setTimeout(() => { db.ref(`games/${gameId}/gameState`).update({ spinning: false }); }, 5000);
 
         res.json({ success: true, number: winnerPrize.number, secretPrize: winnerPrize.secret });
