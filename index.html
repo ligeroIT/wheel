@@ -197,6 +197,15 @@
             </div>
         </div>
 
+        <div id="game-over-view" class="hidden">
+            <div style="background: #f8f9fa; border: 2px solid #ddd; color: #555; padding: 40px; border-radius: 12px; margin-top: 20px;">
+                <div style="font-size: 3rem; margin-bottom: 10px;">🤷‍♂️</div>
+                <h2>To już koniec!</h2>
+                <p>Wszystkie nagrody w tej grze zostały już wylosowane.</p>
+                <p style="font-size: 0.9rem; margin-top: 20px; color: #888;">Dziękujemy za udział w zabawie.</p>
+            </div>
+        </div>
+
         <div id="wheel-area" class="hidden">
             <h2 id="status-text" style="color: var(--primary);">Twoja kolej!</h2>
             <div id="canvas-wrapper">
@@ -276,9 +285,8 @@
         document.getElementById('custom-modal').classList.add('active');
     };
     window.closeModal = () => document.getElementById('custom-modal').classList.remove('active');
-    
     window.switchView = (id) => {
-        ['view-home', 'view-creator', 'view-game', 'view-history'].forEach(v => document.getElementById(v).classList.add('hidden'));
+        ['view-home','view-creator','view-game','view-history'].forEach(v => document.getElementById(v).classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
     }
     window.switchTab = (id) => {
@@ -357,7 +365,7 @@
             authType:document.getElementById('newAuthType').value, 
             spinLimit:document.getElementById('newLimit').value, 
             theme:document.getElementById('newColorTheme').value,
-            title:document.getElementById('newGameTitle').value // Zapis tytułu
+            title:document.getElementById('newGameTitle').value
         };
         try {
             const res=await fetch(`${API_URL}/api/create-game`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${playerToken}`},body:JSON.stringify({config,prizes})});
@@ -367,7 +375,6 @@
                 navigator.clipboard.writeText(url).catch(e=>{});
                 loadCreatedGames(); switchView('view-home'); 
                 
-                // RICH MODAL
                 showModal("Sukces! 🎉", `
                     <div style="text-align:center;">
                         <p style="font-size:1.1rem; color:#555;">Gra utworzona!</p>
@@ -402,9 +409,8 @@
 
     function refreshGameView(id) {
         document.getElementById('displayGameId').innerText = id;
-        document.getElementById('displayGameTitle').innerText = window.currentConfig?.title || ''; // Pokaż tytuł
-
-        ['player-auth-form','wheel-area','already-played-view','player-logged-in-msg','player-guest-form'].forEach(i=>document.getElementById(i).classList.add('hidden'));
+        document.getElementById('displayGameTitle').innerText = window.currentConfig?.title || '';
+        ['player-auth-form','wheel-area','already-played-view','player-logged-in-msg','player-guest-form', 'game-over-view'].forEach(i=>document.getElementById(i).classList.add('hidden'));
         ['inputName','inputEmail','btnSubmitPlayer','social-login-section'].forEach(i=>document.getElementById(i).classList.add('hidden'));
 
         if(auth.currentUser && !auth.currentUser.isAnonymous) {
@@ -477,9 +483,23 @@
             const val = snap.val(); if(!val) return;
             const all = Object.entries(val.prizes || {}).map(([k,v])=>({...v, id:k}));
             const st = val.gameState || {};
+            
+            // FILTR: Pokaż tylko niewygrane LUB aktualnie kręconą nagrodę
             activePrizes = all.filter(p => !p.wonBy || (st.spinning && st.prizeId === p.id));
-            drawWheel();
-            if(st.spinning) {
+            
+            const wheelArea = document.getElementById('wheel-area');
+            const gameOverView = document.getElementById('game-over-view');
+
+            if(activePrizes.length === 0) {
+                wheelArea.classList.add('hidden');
+                gameOverView.classList.remove('hidden');
+            } else {
+                wheelArea.classList.remove('hidden');
+                gameOverView.classList.add('hidden');
+                drawWheel();
+            }
+
+            if(st.spinning && activePrizes.length > 0) {
                 document.getElementById('spinBtn').disabled=true;
                 const idx = activePrizes.findIndex(p => p.id === st.prizeId);
                 if(idx > -1) {
@@ -510,66 +530,31 @@
     }
 
     document.getElementById('spinBtn').onclick = async () => {
-        const h={'Content-Type':'application/json'}; 
-        if(auth.currentUser) {
-            const token = await auth.currentUser.getIdToken();
-            h['Authorization'] = `Bearer ${token}`;
-        }
-        
+        const h={'Content-Type':'application/json'}; if(auth.currentUser) h['Authorization'] = `Bearer ${await auth.currentUser.getIdToken()}`;
         try {
             const res = await fetch(`${API_URL}/api/spin`,{method:'POST',headers:h,body:JSON.stringify({gameId:currentGameId,userData:playerData})});
             const d = await res.json();
-            
             if(!d.success) {
-                // OBSŁUGA ŁADNEGO POPUPU LIMITU
-                if(d.code === 'LIMIT_REACHED') {
-                    let msg = `
-                        <div style="text-align:center;">
-                            <div style="font-size:3rem; margin-bottom:10px;">🛑</div>
-                            <h3 style="color:#e74c3c; margin:0;">Limit wykorzystany!</h3>
-                            <p style="color:#666;">Wykorzystałeś już wszystkie losowania w tej grze.</p>
-                    `;
-
-                    // Jeśli backend odesłał starą nagrodę -> pokaż ją!
-                    if (d.oldPrize) {
-                        msg += `
-                            <div style="background:#d4edda; border:2px solid #c3e6cb; border-radius:12px; padding:20px; margin-top:20px; color:#155724;">
-                                <p style="margin:0; font-weight:bold; text-transform:uppercase; font-size:0.8rem; letter-spacing:1px;">Przypomnienie</p>
-                                <p style="margin:5px 0;">Twoja wygrana to:</p>
-                                <h2 style="margin:10px 0; font-size:2rem;">${d.oldPrize.secret}</h2>
-                                <small style="opacity:0.8;">Numer na kole: ${d.oldPrize.number}</small>
-                            </div>
-                        `;
-                    }
-
+                if(d.code==='LIMIT_REACHED') {
+                    let msg = `<div style="text-align:center;"><div style="font-size:3rem;margin-bottom:10px;">🛑</div><h3 style="color:#e74c3c;margin:0;">Limit wykorzystany!</h3><p style="color:#666;">To koniec Twoich losowań.</p>`;
+                    if (d.oldPrize) msg += `<div style="background:#d4edda;border:2px solid #c3e6cb;border-radius:12px;padding:20px;margin-top:20px;color:#155724;"><p style="margin:0;font-weight:bold;font-size:0.8rem;">TWOJA NAGRODA:</p><h2 style="margin:10px 0;font-size:2rem;">${d.oldPrize.secret}</h2></div>`;
                     msg += `</div>`;
                     showModal("Koniec Gry", msg);
-                } else {
-                    showModal("Błąd", d.error || "Wystąpił błąd", true);
+                } 
+                else if (d.code === 'NO_PRIZES') {
+                    showModal("Pusto!", "Wszystkie nagrody zostały już rozdane. 😢", true);
                 }
+                else showModal("Błąd", d.error || "Wystąpił błąd", true);
             } else {
-                // SUKCES (WYGRANA)
-                setTimeout(()=>{
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                    showModal("🎉 GRATULACJE!", `
-                        <div style="text-align:center;">
-                            <p>Wylosowałeś numer: <b>${d.number}</b></p>
-                            <div style="background:#f8f9fa; padding:20px; border-radius:10px; margin-top:10px;">
-                                <small style="color:#888;">TWOJA NAGRODA:</small><br>
-                                <h1 style="color:var(--primary); margin:10px 0;">${d.secretPrize}</h1>
-                            </div>
-                        </div>
-                    `);
-                }, 5500);
+                setTimeout(()=>{ confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); showModal("GRATULACJE!", `Nagroda: <h1>${d.secretPrize}</h1>`); }, 5500);
             }
-        } catch(e) { showModal("Błąd","Problem z połączeniem z serwerem", true); }
+        } catch(e) { showModal("Błąd","Sieć"); }
     }
 
     window.copyLink=(id)=>{navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?game=${id}`);showModal("OK","Skopiowano")};
     window.shareGame=()=>window.copyLink(currentGameId);
     window.showHistory=async(id)=>{
-        window.switchView('view-history'); 
-        document.getElementById('history-prizes-body').innerHTML='Trwa ładowanie...';
+        window.switchView('view-history'); document.getElementById('history-prizes-body').innerHTML='Trwa ładowanie...';
         let token = null; if(auth.currentUser) token = await auth.currentUser.getIdToken();
         const r=await fetch(`${API_URL}/api/game/${id}/admin-details`,{headers:{'Authorization':`Bearer ${token}`}});
         const d=await r.json();
