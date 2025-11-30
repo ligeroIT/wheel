@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
     "bump": "node bump.js",
     "deploy": "node bump.js && git add . && git commit -m \"Auto-update version\" && git push"
   },
