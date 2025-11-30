@@ -1,14 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
-const { v4: uuidv4 } = require('uuid');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// POBIERAMY KLUCZE Z RENDER.COM
-// Upewnij się, że dodałeś te zmienne w panelu Render!
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 const dbUrl = process.env.FIREBASE_DB_URL;
 
@@ -20,8 +17,6 @@ admin.initializeApp({
 const db = admin.database();
 
 // --- POMOCNICY ---
-
-// Generuje krótki kod np. "X9P2M" (bez mylących znaków O/0/I/1)
 function generateRandomId(length = 6) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
@@ -31,7 +26,6 @@ function generateRandomId(length = 6) {
     return result;
 }
 
-// Middleware: Sprawdza token (jeśli user jest zalogowany)
 async function verifyTokenOptional(req, res, next) {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (token) {
@@ -47,17 +41,15 @@ async function verifyTokenOptional(req, res, next) {
 
 // --- ENDPOINTY ---
 
-// 1. TWORZENIE GRY (Wymaga bycia zalogowanym Adminem)
+// 1. TWORZENIE GRY
 app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Musisz być zalogowany przez Google, by stworzyć grę." });
+    if (!req.user) return res.status(401).json({ error: "Musisz być zalogowany." });
     
     const { config, prizes } = req.body; 
-    
     let gameId = null;
     let isUnique = false;
     let attempts = 0;
 
-    // Szukamy wolnego ID
     while (!isUnique && attempts < 10) {
         gameId = generateRandomId(6);
         const snap = await db.ref(`games/${gameId}`).once('value');
@@ -65,11 +57,10 @@ app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
         attempts++;
     }
 
-    if (!isUnique) return res.status(500).json({ error: "Błąd serwera (ID collision). Spróbuj ponownie." });
+    if (!isUnique) return res.status(500).json({ error: "Błąd serwera. Spróbuj ponownie." });
 
-    // Zapisujemy nową grę
     await db.ref(`games/${gameId}`).set({
-        adminUid: req.user.uid, // Ten kto założył jest Adminem TEGO pokoju
+        adminUid: req.user.uid,
         config: config,
         prizes: prizes,
         createdAt: Date.now()
@@ -78,19 +69,47 @@ app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
     res.json({ success: true, gameId });
 });
 
-// 2. META DANE GRY (Publiczne - żeby frontend wiedział czy pokazać input imienia czy login Google)
+// 2. NOWOŚĆ: MOJE GRY (Dla Dashboardu Admina)
+app.get('/api/my-games', verifyTokenOptional, async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Musisz być zalogowany." });
+
+    try {
+        // Pobieramy gry, gdzie adminUid == uid użytkownika
+        const ref = db.ref('games');
+        const snapshot = await ref.orderByChild('adminUid').equalTo(req.user.uid).once('value');
+        
+        const games = [];
+        snapshot.forEach(child => {
+            const val = child.val();
+            // Zwracamy tylko podstawowe dane, bez sekretów!
+            games.push({
+                id: child.key,
+                createdAt: val.createdAt,
+                prizesCount: val.prizes ? Object.keys(val.prizes).length : 0
+            });
+        });
+
+        // Sortowanie od najnowszych
+        games.sort((a, b) => b.createdAt - a.createdAt);
+
+        res.json({ games });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Błąd pobierania gier." });
+    }
+});
+
+// 3. META DANE GRY
 app.get('/api/game/:gameId/meta', async (req, res) => {
     const { gameId } = req.params;
     const snap = await db.ref(`games/${gameId}/config`).once('value');
-    
     if (!snap.exists()) return res.status(404).json({ error: "Taka gra nie istnieje." });
-    
     res.json({ config: snap.val() });
 });
 
-// 3. LOSOWANIE (SPIN)
+// 4. LOSOWANIE (SPIN)
 app.post('/api/spin', verifyTokenOptional, async (req, res) => {
-    const { gameId, userData } = req.body; // userData to { name: "..." } lub { email: "..." }
+    const { gameId, userData } = req.body;
 
     if (!gameId) return res.status(400).json({ error: "Brak ID gry" });
 
@@ -102,44 +121,42 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         const game = gameSnap.val();
         const config = game.config;
         
-        // A. Weryfikacja tożsamości gracza
         let playerId = null;
         let playerName = null;
 
+        // Logika Auth
         if (config.authType === 'google') {
-            if (!req.user) return res.status(401).json({ error: "W tym pokoju wymagane jest logowanie Google." });
+            if (!req.user) return res.status(401).json({ error: "Wymagane logowanie Google." });
             playerId = req.user.uid;
             playerName = req.user.name || req.user.email;
         } else if (config.authType === 'email') {
             if (!userData?.email) return res.status(400).json({ error: "Podaj email" });
-            playerId = userData.email.replace(/[.#$/[\]]/g, '_'); // Firebase nie lubi kropek w kluczach
+            playerId = userData.email.replace(/[.#$/[\]]/g, '_');
             playerName = userData.email;
         } else {
-            // 'name' - najprostsza opcja
             if (!userData?.name) return res.status(400).json({ error: "Podaj imię" });
-            playerId = userData.name.toLowerCase().trim() + "_" + Date.now(); // Dodajemy timestamp dla unikalności
+            // Tworzymy ID z imienia (uproszczone, by blokować ponowne losowanie na to samo imię)
+            playerId = userData.name.toLowerCase().trim();
             playerName = userData.name;
         }
 
-        // B. Sprawdzenie limitów (ile razy ten playerId już grał)
+        // SPRAWDZENIE LIMITÓW
         const userHistory = game.users?.[playerId] || { spinsUsed: 0 };
         if (userHistory.spinsUsed >= config.spinLimit) {
-            return res.status(403).json({ error: "Wykorzystałeś już swój limit losowań!" });
+            // Zwracamy specjalny kod błędu 'LIMIT_REACHED' dla frontendu
+            return res.status(403).json({ error: "Wykorzystałeś już swój limit losowań!", code: "LIMIT_REACHED" });
         }
 
-        // C. Losowanie nagrody
         const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
         const available = allPrizes.filter(p => !p.wonBy);
 
-        if (available.length === 0) return res.status(404).json({ error: "Wszystkie nagrody zostały rozdane!" });
+        if (available.length === 0) return res.status(404).json({ error: "Wszystkie nagrody zostały rozdane!", code: "NO_PRIZES" });
 
         const winnerPrize = available[Math.floor(Math.random() * available.length)];
 
-        // D. Zapisz wynik (Atomowo)
         const updates = {};
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonBy`] = playerId;
         updates[`games/${gameId}/users/${playerId}/spinsUsed`] = userHistory.spinsUsed + 1;
-        // Uruchom animację
         updates[`games/${gameId}/gameState`] = {
             spinning: true,
             spinnerName: playerName,
@@ -149,10 +166,8 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         await db.ref().update(updates);
 
-        // Wyłącz animację po 5s
         setTimeout(() => { db.ref(`games/${gameId}/gameState`).update({ spinning: false }); }, 5000);
 
-        // E. Zwróć SECRET (Tylko zwycięzca to zobaczy)
         res.json({
             success: true,
             number: winnerPrize.number,
