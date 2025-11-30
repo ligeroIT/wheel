@@ -47,7 +47,7 @@
         
         /* Stylizacja Formularza */
         .contact-form {
-            margin-top: 30px;
+            margin-top: 40px;
             padding-top: 20px;
             border-top: 1px solid #eee;
         }
@@ -82,14 +82,21 @@
             background-color: #1c5980;
         }
 
-        /* --- TUTAJ DODAŁEM style dla footera --- */
+        /* --- STOPKA (identyczna jak w Terms) --- */
         footer {
-            text-align: center;      /* To centruje tekst */
-            margin-top: 50px;        /* Odstęp od formularza */
-            padding-top: 20px;       /* Odstęp wewnętrzny */
-            border-top: 1px solid #eee; /* Linia oddzielająca */
-            font-size: 0.9em;        /* Nieco mniejsza czcionka */
-            color: #777;             /* Szary kolor */
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 0.9em;
+            color: #777;
+        }
+        footer a {
+            color: inherit;
+            text-decoration: underline;
+        }
+        footer a:hover {
+            text-decoration: none;
         }
     </style>
 </head>
@@ -140,12 +147,11 @@
         If you wish for us to manually delete any game records associated with your account from our database, please use the contact form below.</p>
 
         <div class="contact-form">
-            <h2>Contact Us / Data Deletion Request</h2>
-            <p>If you have any questions about this Privacy Policy or wish to request data deletion, please fill out the form below:</p>
+            <h3>📩 Contact Us / Data Deletion Request</h3>
+            <p>For privacy inquiries or to request manual data deletion.</p>
             
             <form action="https://formsubmit.co/lk@ligero.one" method="POST">
-                
-                <input type="hidden" name="_subject" value="Wheel Decide - Privacy/Data Request">
+                <input type="hidden" name="_subject" value="Wheel Decide - Privacy Request">
                 <input type="hidden" name="_captcha" value="false">
                 <input type="hidden" name="_next" value="https://ligeroit.github.io/wheel-decide/privacy.html"> 
 
@@ -156,7 +162,7 @@
 
                 <div class="form-group">
                     <label for="message">Message:</label>
-                    <textarea name="message" id="message" rows="5" placeholder="Enter your request here..." required></textarea>
+                    <textarea name="message" id="message" rows="5" placeholder="I would like to request deletion of my data..." required></textarea>
                 </div>
 
                 <button type="submit">Send Message</button>
@@ -165,10 +171,12 @@
 
         <footer>
             <p>Built with ❤️ by <strong>LigeroIT</strong></p>
-            <p style="font-size: 0.8rem;">
+            <p>
                 &copy; 2025 LigeroIT. 
-                <a href="privacy.html" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
-                </p>
+                <a href="terms.html">Terms of Service</a>
+                &nbsp;|&nbsp;
+                <a href="index.html">Back to App</a>
+            </p>
         </footer>
         
     </div>
