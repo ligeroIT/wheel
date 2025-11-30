@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Wheel Decide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            background-color: #f9f9f9;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        p, li {
+            margin-bottom: 10px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            text-decoration: none;
+            color: #2980b9;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Stylizacja Formularza */
+        .contact-form {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="email"], 
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            box-sizing: border-box; /* Ważne, żeby padding nie rozszerzał pola */
+        }
+        button {
+            background-color: #2980b9;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1c5980;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; Back to App</a>
+
+        <h1>Privacy Policy for Wheel Decide</h1>
+        <p>Last updated: November 30, 2025</p>
+
+        <p>Thank you for using "Wheel Decide" ("the App"). This Privacy Policy explains how we collect, use, and protect your information when you use our App via Facebook Login.</p>
+
+        <h2>1. Data Controller</h2>
+        <p>The data controller for this App is Ligero IT. If you have any questions, please contact us using the form below.</p>
+
+        <h2>2. Information We Collect</h2>
+        <p>The App uses Facebook Login for authentication. With your permission, we may access the following public information:</p>
+        <ul>
+            <li><strong>Name:</strong> To display your name on the wheel or player list.</li>
+            <li><strong>Profile Picture:</strong> To display your avatar in the game.</li>
+            <li><strong>Email Address:</strong> Used as a unique identifier for your user account.</li>
+        </ul>
+
+        <h2>3. How We Use Your Data</h2>
+        <p>Your data is used solely for the following purposes:</p>
+        <ul>
+            <li>To authenticate you and log you into the App.</li>
+            <li>To facilitate the game mechanics (spinning the wheel, displaying participants).</li>
+            <li>To save the game state in real-time.</li>
+        </ul>
+
+        <h2>4. Data Sharing and Storage</h2>
+        <p>We do not sell or share your personal data with third parties for marketing purposes. Your data is stored securely using cloud services (Google Firebase/Render) required for the App's functionality.</p>
+
+        <h2>5. Data Deletion Instructions</h2>
+        <p>Per Facebook Platform rules, you have the right to request that your data be deleted.</p>
+        
+        <p><strong>Option A (Self-Service via Facebook):</strong><br>
+        You can revoke the App's access to your data at any time via your Facebook settings:</p>
+        <ol>
+            <li>Go to your Facebook "Settings & Privacy".</li>
+            <li>Select "Settings" > "Apps and Websites".</li>
+            <li>Find "Wheel Decide" in the list and click "Remove".</li>
+        </ol>
+
+        <p><strong>Option B (Manual Request):</strong><br>
+        If you wish for us to manually delete any game records associated with your account from our database, please use the contact form below.</p>
+
+        <div class="contact-form">
+            <h2>Contact Us / Data Deletion Request</h2>
+            <p>If you have any questions about this Privacy Policy or wish to request data deletion, please fill out the form below:</p>
+            
+            <form action="https://formsubmit.co/lk@ligero.one" method="POST">
+                
+                <input type="hidden" name="_subject" value="Wheel Decide - Privacy/Data Request">
+                <input type="hidden" name="_captcha" value="false"> <input type="hidden" name="_next" value="https://ligeroit.github.io/wheel-decide/privacy.html"> <div class="form-group">
+                    <label for="email">Your Email Address:</label>
+                    <input type="email" name="email" id="email" placeholder="name@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Message:</label>
+                    <textarea name="message" id="message" rows="5" placeholder="Enter your request here..." required></textarea>
+                </div>
+
+                <button type="submit">Send Message</button>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -28,7 +28,7 @@
         /* INPUTS */
         input, select { padding: 12px; width: 100%; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         
-        /* TABS (DASHBOARD) */
+        /* TABS */
         .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
         .tab { flex: 1; padding: 15px; cursor: pointer; color: #888; font-weight: bold; }
         .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
@@ -51,8 +51,6 @@
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         
         .social-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
-        
-        /* TABLES */
         .audit-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         .audit-table th, .audit-table td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
         .audit-table th { background: #f8f9fa; }
@@ -79,7 +77,7 @@
             <h3>Twoje Konto</h3>
             
             <div id="auth-logged-out">
-                <p>Zaloguj się, aby tworzyć gry lub zobaczyć historię swoich wygranych.</p>
+                <p>Zaloguj się, aby tworzyć gry lub zachować historię wygranych.</p>
                 <div class="social-btns">
                     <button onclick="login('google')" class="btn-google">Google</button>
                     <button onclick="login('facebook')" class="btn-fb">Facebook</button>
@@ -133,7 +131,7 @@
 
     <div id="view-game" class="hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <button onclick="switchView('view-home')" class="btn-outline btn-sm">Wyjdź</button>
+            <button onclick="switchView('view-home')" class="btn-outline btn-sm">Wróć</button>
             <div style="background:#eee; padding:5px 10px; border-radius:5px; font-size: 0.9rem;">
                 KOD: <span id="displayGameId" style="font-weight:bold;"></span>
                 <button onclick="shareGame()" class="btn-sm btn-primary" title="Kopiuj">🔗</button>
@@ -144,20 +142,21 @@
             <h3>Dołącz do gry</h3>
             
             <div id="player-logged-in-msg" class="hidden" style="margin-bottom:15px;">
-                <p>Jesteś zalogowany jako <b id="playerLoggedInName"></b>.</p>
+                <p>Jesteś w grze jako: <b id="playerLoggedInName" style="color:var(--primary);"></b></p>
                 <button onclick="checkAndPlay()" class="btn-success">Graj jako ten użytkownik</button>
-                <button onclick="logout()" class="btn-outline btn-sm">Zmień konto</button>
+                <br>
+                <button onclick="logout()" class="btn-outline btn-sm" style="margin-top:10px;">Zmień konto / Imię</button>
             </div>
 
             <div id="player-guest-form" class="hidden">
-                <p id="auth-msg-text">Wybierz metodę:</p>
+                <p id="auth-msg-text">Podaj dane:</p>
                 
                 <input type="text" id="inputName" placeholder="Twoje Imię..." class="hidden">
                 <input type="email" id="inputEmail" placeholder="Twój Email..." class="hidden">
                 <button id="btnSubmitPlayer" class="btn-success hidden" onclick="checkAndPlay()">Dalej</button>
 
                 <div id="social-login-section" class="hidden">
-                    <p style="font-size:0.9rem; color:#666; margin:10px 0;">Lub zaloguj się (zalecane):</p>
+                    <p style="font-size:0.9rem; color:#666; margin:10px 0;">Lub zaloguj się:</p>
                     <div class="social-btns">
                         <button onclick="login('google')" class="btn-google btn-sm">Google</button>
                         <button onclick="login('facebook')" class="btn-fb btn-sm">Facebook</button>
@@ -202,8 +201,15 @@
         </div>
     </div>
 
-    <footer>Built with ❤️ by <strong>LigeroIT</strong></footer>
+    <footer>
+        <p>Built with ❤️ by <strong>LigeroIT</strong></p>
+        <p>
+            &copy; 2025 LigeroIT. 
+            <a href="privacy.html" target="_blank" style="color: inherit; text-decoration: underline;">Polityka Prywatności</a>
+        </p>
+    </footer>
 </div>
+
 
 <div id="custom-modal" class="modal-overlay">
     <div class="modal-content">
@@ -215,7 +221,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, FacebookAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     import { firebaseConfig, API_URL } from './config.js';
 
@@ -223,7 +229,6 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
     
-    // Providery
     const providers = {
         google: new GoogleAuthProvider(),
         facebook: new FacebookAuthProvider()
@@ -270,23 +275,31 @@
         } catch (e) { showModal("Błąd logowania", e.message, true); }
     };
     
-    window.logout = () => signOut(auth);
+    window.logout = async () => {
+        // Czyścimy pamięć gościa przy wylogowaniu
+        localStorage.removeItem('wheel_guest_data');
+        await signOut(auth);
+        window.location.reload(); // Odświeżamy dla czystego stanu
+    };
 
     onAuthStateChanged(auth, async (user) => {
-        if (user) {
+        if (user && !user.isAnonymous) {
+            // ZALOGOWANY NORMALNIE (Google/FB)
             playerToken = await user.getIdToken();
             document.getElementById('auth-logged-out').classList.add('hidden');
             document.getElementById('auth-logged-in').classList.remove('hidden');
             document.getElementById('userName').innerText = user.displayName || user.email;
             
-            // Jeśli jesteśmy w widoku gry, zaktualizuj interfejs
+            // Jeśli jesteśmy w grze
             if(!document.getElementById('view-game').classList.contains('hidden')) {
                 refreshGameView(currentGameId);
             } else {
-                loadCreatedGames(); // Domyślnie ładujemy admin dashboard
+                loadCreatedGames();
             }
         } else {
-            playerToken = null;
+            // WYLOGOWANY lub ANONIM
+            // Sprawdzamy czy był tu anonim wcześniej
+            if (!user) playerToken = null;
             document.getElementById('auth-logged-in').classList.add('hidden');
             document.getElementById('auth-logged-out').classList.remove('hidden');
             
@@ -296,7 +309,7 @@
         }
     });
 
-    // --- DASHBOARD (ZAKŁADKI) ---
+    // --- DASHBOARD ---
     async function loadCreatedGames() {
         const list = document.getElementById('list-created-games');
         list.innerHTML = 'Ładowanie...';
@@ -376,50 +389,75 @@
             if(!res.ok) throw new Error("Nie ma takiej gry");
             const data = await res.json();
             currentGameId = id;
-            window.currentConfig = data.config; // Zapisz config globalnie
+            window.currentConfig = data.config;
             refreshGameView(id);
             switchView('view-game');
         } catch(e) { showModal("Błąd", e.message); }
     };
 
     function refreshGameView(id) {
-        // Reset widoku
         document.getElementById('displayGameId').innerText = id;
         ['player-auth-form','wheel-area','already-played-view','player-logged-in-msg','player-guest-form'].forEach(i=>document.getElementById(i).classList.add('hidden'));
         ['inputName','inputEmail','btnSubmitPlayer','social-login-section'].forEach(i=>document.getElementById(i).classList.add('hidden'));
 
-        // 1. Jeśli user jest zalogowany globalnie
-        if(auth.currentUser) {
+        // 1. ZALOGOWANY UŻYTKOWNIK
+        if(auth.currentUser && !auth.currentUser.isAnonymous) {
             document.getElementById('player-auth-form').classList.remove('hidden');
             document.getElementById('player-logged-in-msg').classList.remove('hidden');
             document.getElementById('playerLoggedInName').innerText = auth.currentUser.displayName || auth.currentUser.email;
             return;
         }
 
-        // 2. Jeśli user NIE jest zalogowany -> pokazujemy formularz zgodnie z configiem gry
+        // 2. GOŚĆ Z PAMIĘCI (LOCALSTORAGE)
+        const guestData = JSON.parse(localStorage.getItem('wheel_guest_data'));
+        if (guestData && auth.currentUser && auth.currentUser.isAnonymous) {
+            document.getElementById('player-auth-form').classList.remove('hidden');
+            document.getElementById('player-logged-in-msg').classList.remove('hidden');
+            document.getElementById('playerLoggedInName').innerText = guestData.name || "Gość";
+            
+            // Auto-load playerData from storage
+            playerData = guestData;
+            return;
+        }
+
+        // 3. NOWY GOŚĆ (FORMULARZ)
         document.getElementById('player-auth-form').classList.remove('hidden');
         document.getElementById('player-guest-form').classList.remove('hidden');
         const config = window.currentConfig;
 
         if(config.authType === 'google') {
-            document.getElementById('auth-msg-text').innerText = "Wymagane logowanie:";
             document.getElementById('social-login-section').classList.remove('hidden');
         } else {
-            // Name or Email
             document.getElementById('btnSubmitPlayer').classList.remove('hidden');
             if(config.authType === 'name') document.getElementById('inputName').classList.remove('hidden');
             if(config.authType === 'email') document.getElementById('inputEmail').classList.remove('hidden');
-            // Zawsze pokazujemy opcję logowania jako alternatywę
             document.getElementById('social-login-section').classList.remove('hidden');
         }
     }
 
     window.checkAndPlay = async () => {
-        playerData = { 
-            name: document.getElementById('inputName').value, 
-            email: document.getElementById('inputEmail').value 
-        };
-        const h={'Content-Type':'application/json'}; if(playerToken) h['Authorization']=`Bearer ${playerToken}`;
+        // Jeśli nie mamy danych (bo jesteśmy zalogowani/gość z pamięci), pobierz z formularza
+        if (!playerData.name) {
+            playerData = { 
+                name: document.getElementById('inputName').value, 
+                email: document.getElementById('inputEmail').value 
+            };
+        }
+
+        // DLA GOŚCI: Jeśli nie zalogowany, zrób anonim i zapisz do pamięci
+        if (!auth.currentUser) {
+            try {
+                await signInAnonymously(auth);
+                // ZAPISZ W PAMIĘCI!
+                localStorage.setItem('wheel_guest_data', JSON.stringify(playerData));
+            } catch(e) { console.error("Anon auth failed", e); }
+        }
+
+        const h={'Content-Type':'application/json'}; 
+        if (auth.currentUser) {
+            const token = await auth.currentUser.getIdToken();
+            h['Authorization'] = `Bearer ${token}`;
+        }
 
         try {
             const res = await fetch(`${API_URL}/api/game/${currentGameId}/my-result`, {
@@ -448,7 +486,6 @@
         onValue(ref(db, `games/${gameId}`), (snap) => {
             const val = snap.val();
             if(!val) return;
-            // Filtrowanie nagród
             const all = Object.entries(val.prizes || {}).map(([k,v])=>({...v, id:k}));
             const st = val.gameState || {};
             activePrizes = all.filter(p => !p.wonBy || (st.spinning && st.prizeId === p.id));
@@ -487,7 +524,12 @@
     }
 
     document.getElementById('spinBtn').onclick = async () => {
-        const h={'Content-Type':'application/json'}; if(playerToken) h['Authorization']=`Bearer ${playerToken}`;
+        const h={'Content-Type':'application/json'}; 
+        if(auth.currentUser) {
+            const token = await auth.currentUser.getIdToken();
+            h['Authorization'] = `Bearer ${token}`;
+        }
+        
         try {
             const res = await fetch(`${API_URL}/api/spin`,{method:'POST',headers:h,body:JSON.stringify({gameId:currentGameId,userData:playerData})});
             const d = await res.json();
@@ -509,7 +551,13 @@
     window.showHistory=async(id)=>{
         window.switchView('view-history'); 
         document.getElementById('history-prizes-body').innerHTML='Trwa ładowanie...';
-        const r=await fetch(`${API_URL}/api/game/${id}/admin-details`,{headers:{'Authorization':`Bearer ${playerToken}`}});
+        
+        let token = null;
+        if(auth.currentUser) token = await auth.currentUser.getIdToken();
+
+        const r=await fetch(`${API_URL}/api/game/${id}/admin-details`,{headers:{'Authorization':`Bearer ${token}`}});
+        if(!r.ok) { document.getElementById('history-prizes-body').innerHTML='Brak dostępu lub błąd.'; return; }
+        
         const d=await r.json();
         const pB=document.getElementById('history-prizes-body'); pB.innerHTML='';
         const aB=document.getElementById('history-audit-body'); aB.innerHTML='';
