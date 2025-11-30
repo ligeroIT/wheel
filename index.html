@@ -143,28 +143,9 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-    // 🔴🔴🔴 UZUPEŁNIJ DANE FIREBASE 🔴🔴🔴
-    const firebaseConfig = {
-
-        apiKey: "AIzaSyC7LMxmsx5hxQgYpRr6PGtPGoFJCQ6S_Ag",
-
-        authDomain: "wheel-decide-70f9c.firebaseapp.com",
-
-        databaseURL: "https://wheel-decide-70f9c-default-rtdb.europe-west1.firebasedatabase.app",
-
-        projectId: "wheel-decide-70f9c",
-
-        storageBucket: "wheel-decide-70f9c.firebasestorage.app",
-
-        messagingSenderId: "570584620154",
-
-        appId: "1:570584620154:web:0ee1ac7a1944eb7922afc3"
-
-    };
     
-    // ✅ Twój Backend
-    const API_URL = "https://wheel-kbe8.onrender.com"; 
+    // ✅ IMPORTUJEMY KONFIGURACJĘ Z PLIKU ZEWNĘTRZNEGO
+    import { firebaseConfig, API_URL } from './config.js';
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
