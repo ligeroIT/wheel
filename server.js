@@ -179,7 +179,7 @@ app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res)
     });
 });
 
-// 7. LOSOWANIE (SPIN) - Z WYKLUCZANIEM SAMEGO SIEBIE
+// 7. LOSOWANIE (SPIN) - Z FILTREM "SECRET SANTA" I FIXAMI
 app.post('/api/spin', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     if (!gameId) return res.status(400).json({ error: "Brak ID" });
@@ -234,13 +234,12 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
             });
         }
 
-        // C. LOSOWANIE (Z FILTREM SELF-EXCLUSION)
+        // C. LOSOWANIE (Z FILTREM SECRET SANTA)
         const available = allPrizes.filter(p => {
             // 1. Musi być wolna
             if (p.wonBy) return false;
 
             // 2. Secret nagrody nie może być taki sam jak imię gracza (case insensitive)
-            // Jeśli nagroda to "Adam", a gracz to "Adam" -> nie może wygrać
             const prizeContent = p.secret ? p.secret.toString().toLowerCase().trim() : "";
             const currentPlayer = playerName.toString().toLowerCase().trim();
 
@@ -249,13 +248,12 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
             return true;
         });
 
-        // Jeśli po filtracji nie ma nic (bo np. została tylko moja nagroda)
+        // Jeśli po filtracji nie ma nic
         if (available.length === 0) {
-            // Sprawdzamy, czy w ogóle były jakieś wolne (przed filtrem imienia)
+            // Sprawdzamy czy były jakieś wolne (które odpadły przez nazwę)
             const reallyAvailable = allPrizes.filter(p => !p.wonBy);
             if (reallyAvailable.length > 0) {
-                // Były wolne, ale tylko "moje", więc nie mogę ich wylosować
-                return res.status(409).json({ error: "Nie możesz wylosować samego siebie! Spróbuj zamienić się z kimś.", code: "SELF_DRAW_ERROR" });
+                return res.status(409).json({ error: "Została tylko nagroda z Twoim imieniem! Nie możesz jej wylosować.", code: "SELF_DRAW_ERROR" });
             }
             return res.status(404).json({ error: "Brak nagród!", code: "NO_PRIZES" });
         }
