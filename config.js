@@ -11,4 +11,4 @@ export const firebaseConfig = {
 
 // Adres Twojego backendu na Render.com
 export const API_URL = "https://wheel-kbe8.onrender.com";
-export const APP_VERSION = "1.0.3";
+export const APP_VERSION = "1.0.4";

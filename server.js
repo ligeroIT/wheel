@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Konfiguracja Firebase (Zmienne środowiskowe z Render.com)
+// Konfiguracja Firebase
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 const dbUrl = process.env.FIREBASE_DB_URL;
 
@@ -27,19 +27,24 @@ function generateRandomId(length = 6) {
     return result;
 }
 
-// Funkcja logowania zdarzeń (Audyt)
+// Funkcja usuwająca znaki zakazane przez Firebase (., #, $, [, ])
+function sanitizeKey(text) {
+    if (!text) return "unknown";
+    return text.toString().toLowerCase().trim().replace(/[.#$/[\]]/g, '_');
+}
+
 async function logAudit(gameId, action, description, meta = {}) {
     try {
+        const safeMeta = JSON.parse(JSON.stringify(meta)); // Usuwa undefined
         await db.ref(`games/${gameId}/audit`).push({
             action,
             description,
-            meta,
+            meta: safeMeta,
             timestamp: Date.now()
         });
     } catch (e) { console.error("Audit Log Error:", e); }
 }
 
-// Middleware weryfikacji tokenu (opcjonalny - przepuszcza gości)
 async function verifyTokenOptional(req, res, next) {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (token) {
@@ -47,7 +52,7 @@ async function verifyTokenOptional(req, res, next) {
             const decodedToken = await admin.auth().verifyIdToken(token);
             req.user = decodedToken;
         } catch (e) {
-            console.log("Token invalid or expired");
+            console.log("Token invalid");
         }
     }
     next();
@@ -69,29 +74,28 @@ app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
         attempts++;
     }
 
-    if (!isUnique) return res.status(500).json({ error: "Błąd serwera. Spróbuj ponownie." });
+    if (!isUnique) return res.status(500).json({ error: "Błąd serwera." });
 
     await db.ref(`games/${gameId}`).set({
         adminUid: req.user.uid,
-        config: config, 
+        config: config,
         prizes: prizes,
         createdAt: Date.now()
     });
 
-    const creatorName = req.user.email || req.user.name || req.user.uid;
-    await logAudit(gameId, "GAME_CREATED", `Gra utworzona przez ${creatorName}`);
+    const creator = req.user.email || req.user.uid;
+    await logAudit(gameId, "GAME_CREATED", `Gra utworzona przez ${creator}`);
 
     res.json({ success: true, gameId });
 });
 
-// 2. ADMIN: MOJE GRY (Stworzone)
+// 2. ADMIN: MOJE GRY
 app.get('/api/my-created-games', verifyTokenOptional, async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Musisz być zalogowany." });
 
     try {
         const ref = db.ref('games');
         const snapshot = await ref.orderByChild('adminUid').equalTo(req.user.uid).once('value');
-        
         const games = [];
         snapshot.forEach(child => {
             const val = child.val();
@@ -101,22 +105,17 @@ app.get('/api/my-created-games', verifyTokenOptional, async (req, res) => {
                 prizesCount: val.prizes ? Object.keys(val.prizes).length : 0
             });
         });
-
         games.sort((a, b) => b.createdAt - a.createdAt);
         res.json({ games });
-    } catch (e) {
-        res.status(500).json({ error: "Błąd serwera." });
-    }
+    } catch (e) { res.status(500).json({ error: "Błąd serwera." }); }
 });
 
 // 3. USER: MOJE WYGRANE
 app.get('/api/my-winnings', verifyTokenOptional, async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Zaloguj się, aby zobaczyć historię." });
-    
+    if (!req.user) return res.status(401).json({ error: "Zaloguj się." });
     try {
         const snapshot = await db.ref('games').limitToLast(100).once('value'); 
         const winnings = [];
-
         snapshot.forEach(child => {
             const game = child.val();
             const gameId = child.key;
@@ -133,15 +132,12 @@ app.get('/api/my-winnings', verifyTokenOptional, async (req, res) => {
                 });
             }
         });
-        
         winnings.sort((a, b) => b.wonAt - a.wonAt);
         res.json({ winnings });
-    } catch (e) {
-        res.status(500).json({ error: "Błąd serwera." });
-    }
+    } catch (e) { res.status(500).json({ error: "Błąd serwera." }); }
 });
 
-// 4. META DANE (Publiczne info o grze)
+// 4. META DANE
 app.get('/api/game/:gameId/meta', async (req, res) => {
     const { gameId } = req.params;
     const snap = await db.ref(`games/${gameId}/config`).once('value');
@@ -149,7 +145,7 @@ app.get('/api/game/:gameId/meta', async (req, res) => {
     res.json({ config: snap.val() });
 });
 
-// 5. SPRAWDZENIE STATUSU GRACZA
+// 5. STATUS GRACZA
 app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     let playerId = null;
@@ -157,24 +153,18 @@ app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) =>
     if (req.user) {
         playerId = req.user.uid;
     } else if (userData?.email) {
-        playerId = userData.email.replace(/[.#$/[\]]/g, '_');
+        playerId = sanitizeKey(userData.email);
     } else if (userData?.name) {
-        playerId = userData.name.toLowerCase().trim();
+        playerId = sanitizeKey(userData.name);
     }
 
     if (!playerId) return res.json({ hasPlayed: false });
 
     const prizesSnap = await db.ref(`games/${gameId}/prizes`).once('value');
     let myPrize = null;
-    
     if(prizesSnap.exists()) {
-        prizesSnap.forEach(p => {
-            if(p.val().wonBy === playerId) {
-                myPrize = p.val();
-            }
-        });
+        prizesSnap.forEach(p => { if(p.val().wonBy === playerId) myPrize = p.val(); });
     }
-
     res.json({ hasPlayed: !!myPrize, prize: myPrize });
 });
 
@@ -182,7 +172,6 @@ app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) =>
 app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Zaloguj się" });
     const { gameId } = req.params;
-
     const gameSnap = await db.ref(`games/${gameId}`).once('value');
     if(!gameSnap.exists()) return res.status(404).json({error: "Gra nie istnieje"});
     
@@ -196,7 +185,7 @@ app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res)
     });
 });
 
-// 7. LOSOWANIE (SPIN) - Z PRZYPOMNIENIEM NAGRODY
+// 7. LOSOWANIE (SPIN) - ZABEZPIECZONE DLA GOŚCIA
 app.post('/api/spin', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     if (!gameId) return res.status(400).json({ error: "Brak ID" });
@@ -211,51 +200,47 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         
         let playerId = null;
         let playerName = "Anonim";
-        let playerEmail = null;
+        let playerEmail = "-"; // ✅ DOMYŚLNA WARTOŚĆ (ŻEBY NIE BYŁO UNDEFINED)
 
-        // A. Identyfikacja (jak wcześniej)
+        // A. Identyfikacja
         if (req.user) {
             playerId = req.user.uid;
-            playerName = req.user.name || req.user.email;
-            playerEmail = req.user.email;
+            playerName = req.user.name || req.user.email || "Gość";
+            playerEmail = req.user.email || "-";
         } else {
-            if (config.authType === 'google') return res.status(401).json({ error: "Wymagane logowanie." });
+            if (config.authType === 'google' || config.authType === 'facebook') return res.status(401).json({ error: "Wymagane logowanie." });
             
             if (config.authType === 'email') {
                 if (!userData?.email) return res.status(400).json({ error: "Podaj email" });
-                playerId = userData.email.replace(/[.#$/[\]]/g, '_');
+                playerId = sanitizeKey(userData.email);
                 playerName = userData.email;
                 playerEmail = userData.email;
             } else {
                 if (!userData?.name) return res.status(400).json({ error: "Podaj imię" });
-                playerId = userData.name.toLowerCase().trim();
+                playerId = sanitizeKey(userData.name);
                 playerName = userData.name;
-                playerEmail = userData.email || "-";
+                playerEmail = userData.email || "-"; // ✅ BEZPIECZNIK
             }
         }
 
-        // --- ZMIANA TUTAJ: Pobieramy nagrody WCZEŚNIEJ ---
-        const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
-
-        // B. Limity i Przypomnienie
+        // B. Limity
         const userHistory = game.users?.[playerId] || { spinsUsed: 0 };
-        
         if (userHistory.spinsUsed >= config.spinLimit) {
             await logAudit(gameId, "SPIN_BLOCKED", `Gracz ${playerName} zablokowany (limit)`, { playerId });
             
-            // Szukamy, co ten gracz wygrał wcześniej
+            const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
             const previousPrize = allPrizes.find(p => p.wonBy === playerId);
-
             return res.status(403).json({ 
                 error: "Limit wykorzystany!", 
                 code: "LIMIT_REACHED",
-                // Odsyłamy starą nagrodę
                 oldPrize: previousPrize ? { secret: previousPrize.secret, number: previousPrize.number } : null
             });
         }
 
-        // C. Losowanie (Normalny tryb)
+        // C. Losowanie
+        const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
         const available = allPrizes.filter(p => !p.wonBy);
+
         if (available.length === 0) return res.status(404).json({ error: "Brak nagród!", code: "NO_PRIZES" });
 
         const winnerPrize = available[Math.floor(Math.random() * available.length)];
@@ -264,7 +249,7 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         const updates = {};
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonBy`] = playerId;
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByName`] = playerName;
-        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByEmail`] = playerEmail || '-';
+        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByEmail`] = playerEmail; // ✅ TERAZ TO JEST BEZPIECZNE
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonAt`] = Date.now();
         updates[`games/${gameId}/users/${playerId}/spinsUsed`] = userHistory.spinsUsed + 1;
         
@@ -277,7 +262,7 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         await db.ref().update(updates);
         
-        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} (${playerEmail || '-'}) wygrał: ${winnerPrize.number}`, { 
+        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} (${playerEmail}) wygrał: ${winnerPrize.number}`, { 
             prizeSecret: winnerPrize.secret 
         });
 
@@ -287,7 +272,7 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
     } catch (e) {
         console.error("SPIN ERROR:", e);
-        res.status(500).json({ error: "Błąd serwera" });
+        res.status(500).json({ error: "Błąd serwera. Spróbuj ponownie." });
     }
 });
 
