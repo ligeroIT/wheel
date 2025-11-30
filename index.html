@@ -510,13 +510,59 @@
     }
 
     document.getElementById('spinBtn').onclick = async () => {
-        const h={'Content-Type':'application/json'}; if(auth.currentUser) h['Authorization'] = `Bearer ${await auth.currentUser.getIdToken()}`;
+        const h={'Content-Type':'application/json'}; 
+        if(auth.currentUser) {
+            const token = await auth.currentUser.getIdToken();
+            h['Authorization'] = `Bearer ${token}`;
+        }
+        
         try {
             const res = await fetch(`${API_URL}/api/spin`,{method:'POST',headers:h,body:JSON.stringify({gameId:currentGameId,userData:playerData})});
             const d = await res.json();
-            if(!d.success) showModal(d.code==='LIMIT_REACHED'?"Info":"Błąd", d.error || "Wystąpił błąd", true);
-            else setTimeout(()=>{ confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } }); showModal("GRATULACJE!", `Nagroda: <h1>${d.secretPrize}</h1>`); }, 5500);
-        } catch(e) { showModal("Błąd","Sieć"); }
+            
+            if(!d.success) {
+                // OBSŁUGA ŁADNEGO POPUPU LIMITU
+                if(d.code === 'LIMIT_REACHED') {
+                    let msg = `
+                        <div style="text-align:center;">
+                            <div style="font-size:3rem; margin-bottom:10px;">🛑</div>
+                            <h3 style="color:#e74c3c; margin:0;">Limit wykorzystany!</h3>
+                            <p style="color:#666;">Wykorzystałeś już wszystkie losowania w tej grze.</p>
+                    `;
+
+                    // Jeśli backend odesłał starą nagrodę -> pokaż ją!
+                    if (d.oldPrize) {
+                        msg += `
+                            <div style="background:#d4edda; border:2px solid #c3e6cb; border-radius:12px; padding:20px; margin-top:20px; color:#155724;">
+                                <p style="margin:0; font-weight:bold; text-transform:uppercase; font-size:0.8rem; letter-spacing:1px;">Przypomnienie</p>
+                                <p style="margin:5px 0;">Twoja wygrana to:</p>
+                                <h2 style="margin:10px 0; font-size:2rem;">${d.oldPrize.secret}</h2>
+                                <small style="opacity:0.8;">Numer na kole: ${d.oldPrize.number}</small>
+                            </div>
+                        `;
+                    }
+
+                    msg += `</div>`;
+                    showModal("Koniec Gry", msg);
+                } else {
+                    showModal("Błąd", d.error || "Wystąpił błąd", true);
+                }
+            } else {
+                // SUKCES (WYGRANA)
+                setTimeout(()=>{
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    showModal("🎉 GRATULACJE!", `
+                        <div style="text-align:center;">
+                            <p>Wylosowałeś numer: <b>${d.number}</b></p>
+                            <div style="background:#f8f9fa; padding:20px; border-radius:10px; margin-top:10px;">
+                                <small style="color:#888;">TWOJA NAGRODA:</small><br>
+                                <h1 style="color:var(--primary); margin:10px 0;">${d.secretPrize}</h1>
+                            </div>
+                        </div>
+                    `);
+                }, 5500);
+            }
+        } catch(e) { showModal("Błąd","Problem z połączeniem z serwerem", true); }
     }
 
     window.copyLink=(id)=>{navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?game=${id}`);showModal("OK","Skopiowano")};
