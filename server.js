@@ -27,22 +27,22 @@ function generateRandomId(length = 6) {
     return result;
 }
 
-// Funkcja usuwająca znaki zakazane przez Firebase (., #, $, [, ])
+// ✅ FIX: Funkcja czyszcząca klucze (np. zamienia kropki na podkreślniki)
 function sanitizeKey(text) {
-    if (!text) return "unknown";
+    if (!text) return "unknown_user";
     return text.toString().toLowerCase().trim().replace(/[.#$/[\]]/g, '_');
 }
 
 async function logAudit(gameId, action, description, meta = {}) {
     try {
-        const safeMeta = JSON.parse(JSON.stringify(meta)); // Usuwa undefined
+        const safeMeta = JSON.parse(JSON.stringify(meta));
         await db.ref(`games/${gameId}/audit`).push({
             action,
             description,
             meta: safeMeta,
             timestamp: Date.now()
         });
-    } catch (e) { console.error("Audit Log Error:", e); }
+    } catch (e) { console.error("Audit Error:", e); }
 }
 
 async function verifyTokenOptional(req, res, next) {
@@ -51,19 +51,16 @@ async function verifyTokenOptional(req, res, next) {
         try {
             const decodedToken = await admin.auth().verifyIdToken(token);
             req.user = decodedToken;
-        } catch (e) {
-            console.log("Token invalid");
-        }
+        } catch (e) { console.log("Token invalid"); }
     }
     next();
 }
 
 // --- ENDPOINTY ---
 
-// 1. TWORZENIE GRY
+// 1. CREATE GAME
 app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Zaloguj się, aby stworzyć grę." });
-    
+    if (!req.user) return res.status(401).json({ error: "Wymagane logowanie" });
     const { config, prizes } = req.body; 
     let gameId = null, isUnique = false, attempts = 0;
 
@@ -73,134 +70,99 @@ app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
         if (!snap.exists()) isUnique = true;
         attempts++;
     }
-
-    if (!isUnique) return res.status(500).json({ error: "Błąd serwera." });
+    if (!isUnique) return res.status(500).json({ error: "Błąd serwera" });
 
     await db.ref(`games/${gameId}`).set({
         adminUid: req.user.uid,
-        config: config,
-        prizes: prizes,
-        createdAt: Date.now()
+        config, prizes, createdAt: Date.now()
     });
-
-    const creator = req.user.email || req.user.uid;
-    await logAudit(gameId, "GAME_CREATED", `Gra utworzona przez ${creator}`);
-
+    await logAudit(gameId, "GAME_CREATED", `Utworzono grę`);
     res.json({ success: true, gameId });
 });
 
-// 2. ADMIN: MOJE GRY
+// 2. MY CREATED GAMES
 app.get('/api/my-created-games', verifyTokenOptional, async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Musisz być zalogowany." });
-
+    if (!req.user) return res.status(401).json({ error: "Zaloguj się" });
     try {
         const ref = db.ref('games');
         const snapshot = await ref.orderByChild('adminUid').equalTo(req.user.uid).once('value');
         const games = [];
-        snapshot.forEach(child => {
-            const val = child.val();
-            games.push({
-                id: child.key,
-                createdAt: val.createdAt,
-                prizesCount: val.prizes ? Object.keys(val.prizes).length : 0
-            });
-        });
+        snapshot.forEach(c => games.push({ id: c.key, createdAt: c.val().createdAt, prizesCount: c.val().prizes ? Object.keys(c.val().prizes).length : 0 }));
         games.sort((a, b) => b.createdAt - a.createdAt);
         res.json({ games });
-    } catch (e) { res.status(500).json({ error: "Błąd serwera." }); }
+    } catch (e) { res.status(500).json({ error: "Błąd serwera" }); }
 });
 
-// 3. USER: MOJE WYGRANE
+// 3. MY WINNINGS
 app.get('/api/my-winnings', verifyTokenOptional, async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Zaloguj się." });
+    if (!req.user) return res.status(401).json({ error: "Zaloguj się" });
     try {
         const snapshot = await db.ref('games').limitToLast(100).once('value'); 
         const winnings = [];
-        snapshot.forEach(child => {
-            const game = child.val();
-            const gameId = child.key;
-            if (game.prizes) {
-                Object.values(game.prizes).forEach(prize => {
-                    if (prize.wonBy === req.user.uid) {
-                        winnings.push({
-                            gameId: gameId,
-                            prize: prize.secret,
-                            number: prize.number,
-                            wonAt: prize.wonAt
-                        });
-                    }
-                });
-            }
+        snapshot.forEach(c => {
+            const g = c.val();
+            if (g.prizes) Object.values(g.prizes).forEach(p => {
+                if (p.wonBy === req.user.uid) winnings.push({ gameId: c.key, prize: p.secret, number: p.number, wonAt: p.wonAt });
+            });
         });
-        winnings.sort((a, b) => b.wonAt - a.wonAt);
         res.json({ winnings });
-    } catch (e) { res.status(500).json({ error: "Błąd serwera." }); }
+    } catch (e) { res.status(500).json({ error: "Błąd serwera" }); }
 });
 
-// 4. META DANE
+// 4. GAME META
 app.get('/api/game/:gameId/meta', async (req, res) => {
-    const { gameId } = req.params;
-    const snap = await db.ref(`games/${gameId}/config`).once('value');
-    if (!snap.exists()) return res.status(404).json({ error: "Gra nie istnieje." });
+    const snap = await db.ref(`games/${req.params.gameId}/config`).once('value');
+    if (!snap.exists()) return res.status(404).json({ error: "Brak gry" });
     res.json({ config: snap.val() });
 });
 
-// 5. STATUS GRACZA
+// 5. MY RESULT
 app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     let playerId = null;
 
-    if (req.user) {
-        playerId = req.user.uid;
-    } else if (userData?.email) {
-        playerId = sanitizeKey(userData.email);
-    } else if (userData?.name) {
-        playerId = sanitizeKey(userData.name);
-    }
+    if (req.user) playerId = req.user.uid;
+    else if (userData?.email) playerId = sanitizeKey(userData.email); // ✅ FIX: Sanityzacja
+    else if (userData?.name) playerId = sanitizeKey(userData.name);   // ✅ FIX: Sanityzacja
 
     if (!playerId) return res.json({ hasPlayed: false });
 
-    const prizesSnap = await db.ref(`games/${gameId}/prizes`).once('value');
+    const snap = await db.ref(`games/${gameId}/prizes`).once('value');
     let myPrize = null;
-    if(prizesSnap.exists()) {
-        prizesSnap.forEach(p => { if(p.val().wonBy === playerId) myPrize = p.val(); });
-    }
+    if(snap.exists()) snap.forEach(p => { if(p.val().wonBy === playerId) myPrize = p.val(); });
     res.json({ hasPlayed: !!myPrize, prize: myPrize });
 });
 
-// 6. ADMIN DETALE
+// 6. ADMIN DETAILS
 app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Zaloguj się" });
-    const { gameId } = req.params;
-    const gameSnap = await db.ref(`games/${gameId}`).once('value');
-    if(!gameSnap.exists()) return res.status(404).json({error: "Gra nie istnieje"});
-    
-    const game = gameSnap.val();
-    if(game.adminUid !== req.user.uid) return res.status(403).json({error: "Brak uprawnień"});
-
-    res.json({
-        config: game.config,
-        prizes: game.prizes ? Object.values(game.prizes) : [],
-        audit: game.audit ? Object.values(game.audit).sort((a,b) => b.timestamp - a.timestamp) : []
+    const snap = await db.ref(`games/${req.params.gameId}`).once('value');
+    if(!snap.exists()) return res.status(404).json({error: "Brak gry"});
+    if(snap.val().adminUid !== req.user.uid) return res.status(403).json({error: "Brak dostępu"});
+    const g = snap.val();
+    res.json({ 
+        config: g.config, 
+        prizes: g.prizes ? Object.values(g.prizes) : [], 
+        audit: g.audit ? Object.values(g.audit).sort((a,b)=>b.timestamp-a.timestamp) : [] 
     });
 });
 
-// 7. LOSOWANIE (SPIN) - ZABEZPIECZONE DLA GOŚCIA
+// 7. SPIN - ✅ FIX BŁĘDU 500
 app.post('/api/spin', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     if (!gameId) return res.status(400).json({ error: "Brak ID" });
 
     try {
         const gameRef = db.ref(`games/${gameId}`);
-        const gameSnap = await gameRef.once('value');
-        if (!gameSnap.exists()) return res.status(404).json({ error: "Gra nie istnieje" });
+        const snap = await gameRef.once('value');
+        if (!snap.exists()) return res.status(404).json({ error: "Nie znaleziono gry" });
 
-        const game = gameSnap.val();
+        const game = snap.val();
         const config = game.config;
         
         let playerId = null;
         let playerName = "Anonim";
-        let playerEmail = "-"; // ✅ DOMYŚLNA WARTOŚĆ (ŻEBY NIE BYŁO UNDEFINED)
+        let playerEmail = "-";
 
         // A. Identyfikacja
         if (req.user) {
@@ -208,40 +170,44 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
             playerName = req.user.name || req.user.email || "Gość";
             playerEmail = req.user.email || "-";
         } else {
-            if (config.authType === 'google' || config.authType === 'facebook') return res.status(401).json({ error: "Wymagane logowanie." });
+            if (config.authType === 'google') return res.status(401).json({ error: "Wymagane logowanie" });
             
             if (config.authType === 'email') {
                 if (!userData?.email) return res.status(400).json({ error: "Podaj email" });
-                playerId = sanitizeKey(userData.email);
+                playerId = sanitizeKey(userData.email); // ✅ FIX
                 playerName = userData.email;
                 playerEmail = userData.email;
             } else {
                 if (!userData?.name) return res.status(400).json({ error: "Podaj imię" });
-                playerId = sanitizeKey(userData.name);
+                playerId = sanitizeKey(userData.name);  // ✅ FIX
                 playerName = userData.name;
-                playerEmail = userData.email || "-"; // ✅ BEZPIECZNIK
             }
         }
 
-        // B. Limity
+        // Nadpisanie jeśli dane są w formularzu
+        if (userData?.name) playerName = userData.name;
+        if (userData?.email) playerEmail = userData.email;
+
+        // B. Sprawdzenie limitu
         const userHistory = game.users?.[playerId] || { spinsUsed: 0 };
         if (userHistory.spinsUsed >= config.spinLimit) {
-            await logAudit(gameId, "SPIN_BLOCKED", `Gracz ${playerName} zablokowany (limit)`, { playerId });
+            await logAudit(gameId, "SPIN_BLOCKED", `Limit: ${playerName}`, { playerId });
             
-            const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
-            const previousPrize = allPrizes.find(p => p.wonBy === playerId);
+            // Pobieramy starą nagrodę
+            const all = game.prizes ? Object.values(game.prizes) : [];
+            const old = all.find(p => p.wonBy === playerId);
+            
             return res.status(403).json({ 
-                error: "Limit wykorzystany!", 
+                error: "Limit wykorzystany", 
                 code: "LIMIT_REACHED",
-                oldPrize: previousPrize ? { secret: previousPrize.secret, number: previousPrize.number } : null
+                oldPrize: old ? { secret: old.secret, number: old.number } : null
             });
         }
 
         // C. Losowanie
         const allPrizes = game.prizes ? Object.entries(game.prizes).map(([k, v]) => ({...v, id: k})) : [];
         const available = allPrizes.filter(p => !p.wonBy);
-
-        if (available.length === 0) return res.status(404).json({ error: "Brak nagród!", code: "NO_PRIZES" });
+        if (available.length === 0) return res.status(404).json({ error: "Brak nagród", code: "NO_PRIZES" });
 
         const winnerPrize = available[Math.floor(Math.random() * available.length)];
 
@@ -249,7 +215,7 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         const updates = {};
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonBy`] = playerId;
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByName`] = playerName;
-        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByEmail`] = playerEmail; // ✅ TERAZ TO JEST BEZPIECZNE
+        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByEmail`] = playerEmail;
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonAt`] = Date.now();
         updates[`games/${gameId}/users/${playerId}/spinsUsed`] = userHistory.spinsUsed + 1;
         
@@ -261,29 +227,24 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         };
 
         await db.ref().update(updates);
-        
-        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} (${playerEmail}) wygrał: ${winnerPrize.number}`, { 
-            prizeSecret: winnerPrize.secret 
-        });
+        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} wygrał: ${winnerPrize.number}`, { prize: winnerPrize.secret });
 
         setTimeout(() => { db.ref(`games/${gameId}/gameState`).update({ spinning: false }); }, 5000);
 
         res.json({ success: true, number: winnerPrize.number, secretPrize: winnerPrize.secret });
 
     } catch (e) {
-        console.error("SPIN ERROR:", e);
+        console.error("SERVER ERROR:", e);
         res.status(500).json({ error: "Błąd serwera. Spróbuj ponownie." });
     }
 });
 
 // 8. DELETE
 app.delete('/api/game/:gameId', verifyTokenOptional, async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Zaloguj się" });
-    const { gameId } = req.params;
-    const gameRef = db.ref(`games/${gameId}`);
-    const snap = await gameRef.once('value');
+    if (!req.user) return res.status(401).json({ error: "Brak uprawnień" });
+    const snap = await db.ref(`games/${req.params.gameId}`).once('value');
     if (!snap.exists() || snap.val().adminUid !== req.user.uid) return res.status(403).json({ error: "Błąd" });
-    await gameRef.remove();
+    await db.ref(`games/${req.params.gameId}`).remove();
     res.json({ success: true });
 });
 
