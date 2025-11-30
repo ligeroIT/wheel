@@ -387,23 +387,74 @@
         d.innerHTML=`<input class="p-num" style="width:30%" placeholder="Nr"><input class="p-sec" placeholder="Nagroda">`;
         document.getElementById('prizes-list').appendChild(d);
     }
+    // --- KREATOR (ZAKTUALIZOWANY POPUP) ---
     window.createGame = async () => {
-        const prizes={}; document.querySelectorAll('.p-num').forEach((el,i)=>{ 
-            const n=el.value, s=document.querySelectorAll('.p-sec')[i].value; if(n&&s) prizes[`p_${i}`]={number:n, secret:s, wonBy:null};
+        const prizes = {};
+        document.querySelectorAll('.p-num').forEach((el, i) => {
+            const n = el.value, s = document.querySelectorAll('.p-sec')[i].value;
+            if (n && s) prizes[`p_${i}`] = { number: n, secret: s, wonBy: null };
         });
-        if(Object.keys(prizes).length<2) return showModal("Błąd","Min 2 nagrody");
-        
+
+        if (Object.keys(prizes).length < 2) return showModal("Błąd", "Dodaj min. 2 nagrody", true);
+
         const theme = document.getElementById('newColorTheme').value || 'vibrant';
-        const config={
-            authType:document.getElementById('newAuthType').value, 
-            spinLimit:document.getElementById('newLimit').value,
+        const config = {
+            authType: document.getElementById('newAuthType').value,
+            spinLimit: document.getElementById('newLimit').value,
             theme: theme
         };
+
         try {
-            const res=await fetch(`${API_URL}/api/create-game`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${playerToken}`},body:JSON.stringify({config,prizes})});
-            const d=await res.json();
-            if(d.success) { showModal("Sukces",`KOD: ${d.gameId}`); loadCreatedGames(); switchView('view-home'); }
-        } catch(e){ showModal("Błąd","Sieć"); }
+            const res = await fetch(`${API_URL}/api/create-game`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${playerToken}` },
+                body: JSON.stringify({ config, prizes })
+            });
+            const d = await res.json();
+
+            if (d.success) {
+                // Generujemy link do gry
+                const gameUrl = `${window.location.origin}${window.location.pathname}?game=${d.gameId}`;
+
+                // 1. Próba automatycznego kopiowania do schowka
+                navigator.clipboard.writeText(gameUrl).catch(err => console.log('Auto-copy failed', err));
+
+                loadCreatedGames(); // Odśwież listę w tle
+                switchView('view-home');
+
+                // 2. Wyświetlenie rozbudowanego Modala
+                const modalContent = `
+                    <div style="text-align:center;">
+                        <p style="font-size:1.1rem; color:#555;">Gra została utworzona!</p>
+                        
+                        <div style="background:#f0f2f5; padding:15px; border-radius:8px; margin:15px 0;">
+                            <span style="font-size:0.8rem; text-transform:uppercase; color:#888; font-weight:bold;">Kod Gry</span><br>
+                            <strong style="font-size:2rem; letter-spacing:3px; color:var(--primary);">${d.gameId}</strong>
+                        </div>
+
+                        <p style="margin-bottom:5px; font-size:0.9rem;">Link dla uczestników:</p>
+                        <input type="text" value="${gameUrl}" readonly onclick="this.select()" 
+                               style="width:100%; text-align:center; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:20px; background:#fff; font-family:monospace;">
+
+                        <div style="display:flex; gap:10px; justify-content:center;">
+                            <button onclick="navigator.clipboard.writeText('${gameUrl}'); this.innerText='✅ Skopiowano!'" class="btn-outline" style="flex:1;">
+                                📋 Kopiuj Link
+                            </button>
+                            
+                            <a href="${gameUrl}" target="_blank" style="text-decoration:none; flex:1;">
+                                <button class="btn-success" style="width:100%;">🚀 Otwórz Grę</button>
+                            </a>
+                        </div>
+                    </div>
+                `;
+
+                showModal("Sukces! 🎉", modalContent);
+            } else {
+                showModal("Błąd", d.error, true);
+            }
+        } catch (e) {
+            showModal("Błąd", "Problem z połączeniem sieciowym", true);
+        }
     }
 
     // --- GAME LOGIC ---
