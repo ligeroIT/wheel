@@ -180,5 +180,38 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
     }
 });
 
+// 5. USUWANIE GRY (DELETE)
+app.delete('/api/game/:gameId', verifyTokenOptional, async (req, res) => {
+    // 1. Sprawdź czy user jest zalogowany
+    if (!req.user) return res.status(401).json({ error: "Musisz być zalogowany." });
+
+    const { gameId } = req.params;
+
+    try {
+        const gameRef = db.ref(`games/${gameId}`);
+        const snapshot = await gameRef.once('value');
+
+        if (!snapshot.exists()) {
+            return res.status(404).json({ error: "Gra nie istnieje." });
+        }
+
+        const game = snapshot.val();
+
+        // 2. Sprawdź czy to Twój pokój (Security Check)
+        if (game.adminUid !== req.user.uid) {
+            return res.status(403).json({ error: "Nie masz uprawnień do usunięcia tej gry!" });
+        }
+
+        // 3. Usuń
+        await gameRef.remove();
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Błąd serwera." });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend działa na porcie ${PORT}`));

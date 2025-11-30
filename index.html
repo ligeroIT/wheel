@@ -7,7 +7,7 @@
     <style>
         :root { --primary: #3498db; --success: #2ecc71; --danger: #e74c3c; --dark: #2c3e50; --light: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: var(--light); color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; min-height: 100vh; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); flex: 1; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); flex: 1; width: 100%; box-sizing: border-box; }
         h1, h2 { color: var(--dark); margin-bottom: 20px; }
         .hidden { display: none !important; }
 
@@ -19,7 +19,8 @@
         .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         .btn-outline { background: transparent; border: 2px solid #bdc3c7; color: #7f8c8d; }
-        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+        .btn-sm { padding: 5px 10px; font-size: 0.85rem; }
+        
         input, select { padding: 12px; width: 100%; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         input:focus { border-color: var(--primary); outline: none; }
 
@@ -30,7 +31,7 @@
                  border-top: 35px solid var(--danger); border-left: 20px solid transparent; border-right: 20px solid transparent; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
 
         /* MY GAMES LIST */
-        .game-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid var(--primary); text-align: left; }
+        .game-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid var(--primary); text-align: left; gap: 10px; }
         .game-info strong { font-size: 1.1rem; color: var(--dark); }
         .game-actions { display: flex; gap: 5px; }
 
@@ -40,7 +41,7 @@
         .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; transform: scale(0.8); transition: 0.3s; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
         .modal-overlay.active .modal-content { transform: scale(1); }
         .modal-title { font-size: 1.5rem; margin-bottom: 10px; font-weight: bold; }
-        .modal-body { font-size: 1.1rem; color: #555; margin-bottom: 20px; line-height: 1.5; }
+        .modal-body { font-size: 1.1rem; color: #555; margin-bottom: 20px; line-height: 1.5; word-break: break-word; }
 
         /* FOOTER */
         footer { margin-top: 30px; font-size: 0.8rem; color: #aaa; border-top: 1px solid #eee; padding-top: 20px; }
@@ -68,10 +69,14 @@
                 <button id="homeLoginBtn" class="btn-primary">Zaloguj przez Google</button>
             </div>
             <div id="admin-logged-in" class="hidden">
-                <p>Witaj, <span id="adminName"></span>!</p>
+                <p>Witaj, <strong id="adminName"></strong>!</p>
                 <button onclick="showCreator()" class="btn-primary">➕ Nowa Gra</button>
-                <div id="my-games-list" style="margin-top: 20px;">
-                    <p>Ładowanie Twoich gier...</p>
+                
+                <div style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px;">
+                    <h4 style="margin-bottom: 10px; text-align: left;">Twoje Gry:</h4>
+                    <div id="my-games-list">
+                        <p>Ładowanie listy...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -82,7 +87,7 @@
         <div style="text-align: left;">
             <label>Autoryzacja graczy:</label>
             <select id="newAuthType">
-                <option value="name">Tylko Imię (Luźna gra)</option>
+                <option value="name">Tylko Imię (Szybka gra)</option>
                 <option value="email">Wymagany Email</option>
                 <option value="google">Logowanie Google (Bezpieczne)</option>
             </select>
@@ -101,11 +106,11 @@
     </div>
 
     <div id="view-game" class="hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap: wrap; gap: 10px;">
             <button onclick="switchView('view-home')" class="btn-outline btn-sm">Wyjdź</button>
-            <div style="background:#eee; padding:5px 10px; border-radius:5px; font-family:monospace;">
-                Kod: <span id="displayGameId" style="font-weight:bold;"></span>
-                <button onclick="shareGame()" class="btn-sm btn-primary" style="margin-left:5px;">🔗 Kopiuj Link</button>
+            <div style="background:#eee; padding:5px 10px; border-radius:5px; font-family:monospace; font-size: 0.9rem;">
+                KOD: <span id="displayGameId" style="font-weight:bold;"></span>
+                <button onclick="shareGame()" class="btn-sm btn-primary" style="margin-left:5px;" title="Kopiuj link">🔗</button>
             </div>
         </div>
 
@@ -144,7 +149,7 @@
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
     
-    // ✅ IMPORTUJEMY KONFIGURACJĘ Z PLIKU ZEWNĘTRZNEGO
+    // ✅ IMPORTUJEMY KONFIGURACJĘ (Upewnij się że plik config.js istnieje!)
     import { firebaseConfig, API_URL } from './config.js';
 
     const app = initializeApp(firebaseConfig);
@@ -171,7 +176,11 @@
         ['view-home', 'view-creator', 'view-game'].forEach(v => document.getElementById(v).classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
     }
-    window.showCreator = () => { addPrizeField(); addPrizeField(); switchView('view-creator'); }
+    window.showCreator = () => { 
+        document.getElementById('prizes-list').innerHTML = ''; // Wyczyść stare
+        addPrizeField(); addPrizeField(); 
+        switchView('view-creator'); 
+    }
 
     // --- LOGOWANIE ADMINA ---
     document.getElementById('homeLoginBtn').addEventListener('click', () => signInWithPopup(auth, provider));
@@ -183,17 +192,17 @@
             document.getElementById('admin-logged-in').classList.remove('hidden');
             document.getElementById('adminName').innerText = user.displayName;
             playerToken = await user.getIdToken();
-            loadMyGames(); // Ładujemy dashboard
+            loadMyGames(); // Ładujemy dashboard po zalogowaniu
         } else {
             document.getElementById('admin-logged-in').classList.add('hidden');
             document.getElementById('admin-logged-out').classList.remove('hidden');
         }
     });
 
-    // --- DASHBOARD ADMINA ---
+    // --- DASHBOARD ADMINA (Lista Gier) ---
     async function loadMyGames() {
         const list = document.getElementById('my-games-list');
-        list.innerHTML = '<p>Ładowanie...</p>';
+        list.innerHTML = '<p style="color:#777;">Pobieranie danych...</p>';
         try {
             const res = await fetch(`${API_URL}/api/my-games`, {
                 headers: { 'Authorization': `Bearer ${playerToken}` }
@@ -212,16 +221,37 @@
                 div.className = 'game-item';
                 div.innerHTML = `
                     <div class="game-info">
-                        <strong>${g.id}</strong> <br> <span style="font-size:0.8rem; color:#777;">${date} • Nagród: ${g.prizesCount}</span>
+                        <strong>${g.id}</strong> <br> <span style="font-size:0.85rem; color:#777;">${date} • Nagród: ${g.prizesCount}</span>
                     </div>
                     <div class="game-actions">
                         <button onclick="joinGame('${g.id}')" class="btn-success btn-sm">Otwórz</button>
                         <button onclick="copyLink('${g.id}')" class="btn-outline btn-sm">Link</button>
+                        <button onclick="deleteGame('${g.id}')" class="btn-danger btn-sm" title="Usuń grę">🗑️</button>
                     </div>
                 `;
                 list.appendChild(div);
             });
         } catch(e) { list.innerHTML = '<p style="color:red">Błąd ładowania gier</p>'; }
+    }
+
+    // --- USUWANIE GRY ---
+    window.deleteGame = async (gameId) => {
+        if (!confirm(`⚠️ Czy na pewno usunąć grę ${gameId}?\n\nTej operacji nie można cofnąć.`)) return;
+
+        try {
+            const res = await fetch(`${API_URL}/api/game/${gameId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${playerToken}`, 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showModal("Sukces", "Gra została usunięta.");
+                loadMyGames();
+            } else {
+                showModal("Błąd", data.error, true);
+            }
+        } catch (e) { showModal("Błąd", "Nie udało się połączyć z serwerem.", true); }
     }
 
     // --- LINKI I UDOSTĘPNIANIE ---
@@ -336,7 +366,7 @@
         } catch(e) { showModal("Błąd", "Błąd połączenia", true); }
     };
 
-    // --- LOGIKA KOŁA (NAPRAWIONA GRAFIKA) ---
+    // --- LOGIKA KOŁA (KOLORY + TEKST) ---
     let prizesArr = [];
     let currentRotation = 0;
     const canvas = document.getElementById('wheel');
@@ -364,8 +394,8 @@
                 const idx = prizesArr.findIndex(p => p.id === state.prizeId);
                 if(idx > -1) {
                     const arc = 360 / prizesArr.length;
-                    const target = 360 - (idx * arc) - (arc/2) + 270; // 270 offset dla canvas
-                    const rot = currentRotation + 1800 + (target - (currentRotation%360)); // +5 obrotów
+                    const target = 360 - (idx * arc) - (arc/2) + 270; 
+                    const rot = currentRotation + 1800 + (target - (currentRotation%360)); 
                     
                     canvas.style.transform = `rotate(${rot}deg)`;
                     canvas.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)";
@@ -390,14 +420,12 @@
             const angle = i * arc;
             
             ctx.beginPath();
-            // Jeśli nagroda wygrana -> szary, jeśli nie -> kolor z palety
             ctx.fillStyle = p.wonBy ? '#bdc3c7' : COLORS[i % COLORS.length];
             ctx.moveTo(radius, radius);
             ctx.arc(radius, radius, radius, angle, angle + arc);
             ctx.fill();
-            ctx.stroke(); // Obrys segmentu
+            ctx.stroke(); 
             
-            // Rysowanie Tekstu
             ctx.save();
             ctx.translate(radius, radius);
             ctx.rotate(angle + arc / 2);
@@ -406,7 +434,6 @@
             ctx.font = "bold 28px Segoe UI";
             ctx.shadowColor = "rgba(0,0,0,0.5)";
             ctx.shadowBlur = 4;
-            // Przesunięcie tekstu bliżej krawędzi
             ctx.fillText(p.number, radius - 30, 10);
             ctx.restore();
         });
@@ -424,14 +451,12 @@
             const data = await res.json();
             
             if(!data.success) {
-                // Obsługa błędu limitów
                 if(data.code === 'LIMIT_REACHED') {
                     showModal("Koniec Gry", "Wykorzystałeś już swój limit losowań! 😢", true);
                 } else {
                     showModal("Błąd", data.error, true);
                 }
             } else {
-                // Czekamy 5s na koniec animacji
                 setTimeout(() => {
                     showModal("🎉 GRATULACJE!", `Wylosowałeś numer: <b>${data.number}</b><br><br>NAGRODA:<br><h1>${data.secretPrize}</h1>`);
                 }, 5000);
