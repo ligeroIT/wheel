@@ -16,6 +16,7 @@
         button { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 1rem; font-weight: 600; transition: 0.2s; margin: 5px; }
         button:hover { transform: translateY(-2px); filter: brightness(1.1); }
         button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
@@ -27,7 +28,8 @@
 
         /* INPUTS */
         input, select { padding: 12px; width: 100%; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-        
+        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; text-align: left; font-size: 0.9rem; color: #555; }
+
         /* TABS */
         .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
         .tab { flex: 1; padding: 15px; cursor: pointer; color: #888; font-weight: bold; }
@@ -48,6 +50,9 @@
         .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; text-align: center; transform: scale(0.8); transition: 0.3s; box-shadow: 0 20px 50px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto; }
         .modal-overlay.active .modal-content { transform: scale(1); }
         .result-card { background: #d4edda; border: 2px solid #c3e6cb; color: #155724; padding: 30px; border-radius: 12px; animation: popIn 0.5s; }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .social-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
         
         /* TABLES */
         .audit-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
@@ -75,6 +80,7 @@
 
         <div style="background: #f8f9fa; padding: 20px; border-radius: 12px;">
             <h3>Twoje Konto</h3>
+            
             <div id="auth-logged-out">
                 <p>Zaloguj się, aby tworzyć gry.</p>
                 <div class="social-btns">
@@ -82,19 +88,23 @@
                     <button onclick="login('facebook')" class="btn-fb">Facebook</button>
                 </div>
             </div>
+
             <div id="auth-logged-in" class="hidden">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <p>Witaj, <strong id="userName"></strong>!</p>
                     <button onclick="logout()" class="btn-outline btn-sm">Wyloguj</button>
                 </div>
+                
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('tab-admin')" id="btn-tab-admin">Stworzone Gry</div>
                     <div class="tab" onclick="switchTab('tab-user')" id="btn-tab-user">Moje Wygrane</div>
                 </div>
+
                 <div id="tab-admin">
                     <button onclick="showCreator()" class="btn-primary" style="width:100%; margin-bottom:10px;">➕ Stwórz Nową Grę</button>
                     <div id="list-created-games"><p>Ładowanie...</p></div>
                 </div>
+
                 <div id="tab-user" class="hidden">
                     <div id="list-winnings"><p>Ładowanie...</p></div>
                 </div>
@@ -105,15 +115,20 @@
     <div id="view-creator" class="hidden">
         <h2>Nowa Gra</h2>
         <div style="text-align: left;">
+            <label>Nazwa Gry:</label>
+            <input type="text" id="newGameTitle" placeholder="np. Integracja 2025 (Opcjonalne)">
+
             <label>Autoryzacja:</label>
             <select id="newAuthType">
                 <option value="name">Tylko Imię</option>
                 <option value="email">Wymagany Email</option>
                 <option value="google">Konto Google/FB</option>
             </select>
-            <label>Limit losowań:</label>
+            
+            <label>Limit losowań na osobę:</label>
             <input type="number" id="newLimit" value="1" min="1">
-            <label style="font-weight:bold; margin-top:10px; display:block;">Styl Koła:</label>
+
+            <label>Styl Koła:</label>
             <select id="newColorTheme">
                 <option value="vibrant">🌈 Klasyczna</option>
                 <option value="corporate">👔 Biznesowa</option>
@@ -123,7 +138,8 @@
                 <option value="gold">🏆 Premium Gold</option>
                 <option value="forest">🌲 Natura</option>
             </select>
-            <h3>Nagrody</h3>
+
+            <h3 style="margin-top:20px;">Nagrody</h3>
             <div id="prizes-list"></div>
             <button onclick="addPrizeField()" class="btn-outline" style="width:100%">+ Dodaj nagrodę</button>
         </div>
@@ -143,22 +159,28 @@
             </div>
         </div>
 
+        <h2 id="displayGameTitle" style="color:var(--primary); margin-top:0;"></h2>
+
         <div id="player-auth-form" class="hidden" style="background:#eaf2f8; padding:30px; border-radius:12px;">
             <h3>Dołącz do gry</h3>
+            
             <div id="player-logged-in-msg" class="hidden" style="margin-bottom:15px;">
                 <p>Jesteś w grze jako: <b id="playerLoggedInName" style="color:var(--primary);"></b></p>
                 <button onclick="checkAndPlay()" class="btn-success">Graj jako ten użytkownik</button>
                 <br>
                 <button onclick="logout()" class="btn-outline btn-sm" style="margin-top:10px;">Zmień konto / Imię</button>
             </div>
+
             <div id="player-guest-form" class="hidden">
                 <p id="auth-msg-text">Podaj dane:</p>
-                <input type="text" id="inputName" placeholder="Imię..." class="hidden">
-                <input type="email" id="inputEmail" placeholder="Email..." class="hidden">
+                
+                <input type="text" id="inputName" placeholder="Twoje Imię..." class="hidden">
+                <input type="email" id="inputEmail" placeholder="Twój Email..." class="hidden">
                 <button id="btnSubmitPlayer" class="btn-success hidden" onclick="checkAndPlay()">Dalej</button>
+
                 <div id="social-login-section" class="hidden">
                     <p style="font-size:0.9rem; color:#666; margin:10px 0;">Lub zaloguj się:</p>
-                    <div style="display:flex; gap:10px; justify-content:center;">
+                    <div class="social-btns">
                         <button onclick="login('google')" class="btn-google btn-sm">Google</button>
                         <button onclick="login('facebook')" class="btn-fb btn-sm">Facebook</button>
                     </div>
@@ -228,7 +250,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, FacebookAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    import { firebaseConfig, API_URL, APP_VERSION } from './config.js'; // Zaimportowano APP_VERSION
+    import { firebaseConfig, API_URL, APP_VERSION } from './config.js';
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -254,6 +276,7 @@
         document.getElementById('custom-modal').classList.add('active');
     };
     window.closeModal = () => document.getElementById('custom-modal').classList.remove('active');
+    
     window.switchView = (id) => {
         ['view-home', 'view-creator', 'view-game', 'view-history'].forEach(v => document.getElementById(v).classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
@@ -324,18 +347,41 @@
         d.innerHTML=`<input class="p-num" style="width:30%" placeholder="Nr"><input class="p-sec" placeholder="Nagroda">`;
         document.getElementById('prizes-list').appendChild(d);
     }
+    
+    // --- CREATE GAME (POPUP PRZYWRÓCONY) ---
     window.createGame = async () => {
         const prizes={}; document.querySelectorAll('.p-num').forEach((el,i)=>{ const n=el.value, s=document.querySelectorAll('.p-sec')[i].value; if(n&&s) prizes[`p_${i}`]={number:n, secret:s, wonBy:null}; });
         if(Object.keys(prizes).length<2) return showModal("Błąd","Min 2 nagrody");
-        const config={authType:document.getElementById('newAuthType').value, spinLimit:document.getElementById('newLimit').value, theme:document.getElementById('newColorTheme').value};
+        
+        const config={
+            authType:document.getElementById('newAuthType').value, 
+            spinLimit:document.getElementById('newLimit').value, 
+            theme:document.getElementById('newColorTheme').value,
+            title:document.getElementById('newGameTitle').value // Zapis tytułu
+        };
         try {
             const res=await fetch(`${API_URL}/api/create-game`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${playerToken}`},body:JSON.stringify({config,prizes})});
             const d=await res.json();
             if(d.success) { 
                 const url = `${window.location.origin}${window.location.pathname}?game=${d.gameId}`;
                 navigator.clipboard.writeText(url).catch(e=>{});
-                showModal("Sukces", `Kod Gry: <b>${d.gameId}</b><br><br><a href="${url}" target="_blank">Otwórz Link</a>`);
                 loadCreatedGames(); switchView('view-home'); 
+                
+                // RICH MODAL
+                showModal("Sukces! 🎉", `
+                    <div style="text-align:center;">
+                        <p style="font-size:1.1rem; color:#555;">Gra utworzona!</p>
+                        <div style="background:#f0f2f5; padding:15px; border-radius:8px; margin:15px 0;">
+                            <span style="font-size:0.8rem; text-transform:uppercase; color:#888; font-weight:bold;">Kod Gry</span><br>
+                            <strong style="font-size:2rem; letter-spacing:3px; color:var(--primary);">${d.gameId}</strong>
+                        </div>
+                        <input type="text" value="${url}" readonly onclick="this.select()" style="width:100%; text-align:center; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:20px; font-family:monospace;">
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="navigator.clipboard.writeText('${url}')" class="btn-outline" style="flex:1;">📋 Kopiuj</button>
+                            <a href="${url}" target="_blank" style="flex:1;"><button class="btn-success" style="width:100%;">🚀 Otwórz</button></a>
+                        </div>
+                    </div>
+                `);
             }
         } catch(e){ showModal("Błąd","Sieć"); }
     }
@@ -356,6 +402,8 @@
 
     function refreshGameView(id) {
         document.getElementById('displayGameId').innerText = id;
+        document.getElementById('displayGameTitle').innerText = window.currentConfig?.title || ''; // Pokaż tytuł
+
         ['player-auth-form','wheel-area','already-played-view','player-logged-in-msg','player-guest-form'].forEach(i=>document.getElementById(i).classList.add('hidden'));
         ['inputName','inputEmail','btnSubmitPlayer','social-login-section'].forEach(i=>document.getElementById(i).classList.add('hidden'));
 
@@ -388,8 +436,8 @@
                 document.getElementById('inputName').placeholder = "Imię (Wymagane)";
                 document.getElementById('inputEmail').placeholder = "E-mail (Opcjonalnie)";
             } else {
-                document.getElementById('inputName').placeholder = "Imię (Opcjonalnie)";
-                document.getElementById('inputEmail').placeholder = "E-mail (Wymagane)";
+                document.getElementById('inputName').placeholder = "Imię (Do wyświetlenia)";
+                document.getElementById('inputEmail').placeholder = "E-mail (Wymagany)";
             }
         }
     }
@@ -485,7 +533,6 @@
         d.audit.forEach(a=>aB.innerHTML+=`<tr><td>${a.action}</td><td>${a.description}</td></tr>`);
     };
     
-    // WERSJONOWANIE
     window.onload=()=>{ 
         const p=new URLSearchParams(window.location.search).get('game'); if(p){ document.getElementById('joinGameId').value=p; joinGame(p); }
         if(APP_VERSION) document.getElementById('versionDisplay').innerText = `v${APP_VERSION}`;
