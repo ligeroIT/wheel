@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wheel SaaS</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        h1, h2 { color: #2c3e50; }
+        .hidden { display: none !important; }
+        
+        button { padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-size: 1rem; font-weight: 600; transition: 0.2s; margin: 5px; }
+        button:hover { transform: translateY(-2px); opacity: 0.9; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-outline { background: transparent; border: 2px solid #bdc3c7; color: #7f8c8d; }
+        
+        input, select { padding: 12px; width: 100%; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+        
+        #canvas-wrapper { position: relative; max-width: 450px; margin: 30px auto; }
+        canvas { width: 100%; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2)); }
+        .arrow { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); border-top: 30px solid #e74c3c; border-left: 20px solid transparent; border-right: 20px solid transparent; z-index: 10; }
+        .prize-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="view-home">
+        <h1>Generator Kół Fortuny 🎡</h1>
+        <p>Stwórz własne losowanie lub dołącz do istniejącego.</p>
+        
+        <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
+                <h3>Jesteś Organizatorem?</h3>
+                <button onclick="showCreator()" class="btn-primary">🛠️ Stwórz Nowe Koło</button>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
+                <h3>Jesteś Uczestnikiem?</h3>
+                <input type="text" id="joinGameId" placeholder="Wpisz KOD GRY (np. A9X2B)" style="text-align: center; font-size: 1.2rem; letter-spacing: 2px; text-transform: uppercase;">
+                <button onclick="joinGame()" class="btn-success">Wejdź do Gry</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-creator" class="hidden">
+        <h2>Konfiguracja Nowego Koła</h2>
+        <button onclick="switchView('view-home')" class="btn-outline" style="font-size: 0.8rem;">&larr; Wróć</button>
+        
+        <div id="creator-login">
+            <p>Zaloguj się przez Google, aby zarządzać grą.</p>
+            <button id="creatorLoginBtn" class="btn-primary">Zaloguj przez Google</button>
+        </div>
+        
+        <div id="creator-form" class="hidden" style="text-align: left; margin-top: 20px;">
+            <label><strong>Jak uczestnicy mają dołączać?</strong></label>
+            <select id="newAuthType">
+                <option value="name">Wystarczy podać Imię</option>
+                <option value="email">Wymagany Adres E-mail</option>
+                <option value="google">Logowanie Google</option>
+            </select>
+
+            <label><strong>Limit losowań na osobę:</strong></label>
+            <input type="number" id="newLimit" value="1" min="1">
+
+            <h3 style="margin-top: 30px;">🎁 Lista Nagród</h3>
+            <div id="prizes-list"></div>
+            <button onclick="addPrizeField()" class="btn-outline" style="width: 100%; margin-top: 10px;">+ Dodaj kolejne pole</button>
+            
+            <br><br>
+            <button onclick="createGame()" class="btn-success" style="width: 100%; padding: 15px; font-size: 1.2rem;">🚀 URUCHOM GRĘ</button>
+        </div>
+    </div>
+
+    <div id="view-game" class="hidden">
+        <h3 style="margin-bottom: 0;">Pokój Gry: <span id="displayGameId" style="font-family: monospace; background: #eee; padding: 2px 6px; border-radius: 4px;"></span></h3>
+        <button onclick="switchView('view-home')" class="btn-outline" style="font-size: 0.7rem;">Wyjdź</button>
+        
+        <div id="player-auth-form" style="background:#eaf2f8; padding:20px; border-radius:10px; margin-top: 20px;">
+            <p id="auth-instruction" style="font-weight: bold;">Aby zakręcić, podaj dane:</p>
+            <input type="text" id="inputName" placeholder="Twoje imię..." class="hidden">
+            <input type="email" id="inputEmail" placeholder="Twój e-mail..." class="hidden">
+            <button id="btnGoogleJoin" class="btn-primary hidden">Zaloguj przez Google</button>
+            <button id="btnSubmitPlayer" class="btn-success hidden" onclick="submitPlayerData()">Zatwierdź i Graj</button>
+        </div>
+
+        <div id="wheel-area" class="hidden">
+            <h2 id="status-text" style="color: #e67e22; margin-top: 20px;">Twoja kolej!</h2>
+            <div id="canvas-wrapper"><div class="arrow"></div><canvas id="wheel" width="500" height="500"></canvas></div>
+            <button id="spinBtn" class="btn-primary" style="font-size: 1.3rem; padding: 15px 50px;">ZAKRĘĆ KOŁEM!</button>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // 🔴🔴🔴 UZUPEŁNIJ DANE FIREBASE PONIŻEJ 🔴🔴🔴
+    const firebaseConfig = {
+        apiKey: "AIzaSyC7LMxmsx5hxQgYpRr6PGtPGoFJCQ6S_Ag",
+        authDomain: "wheel-decide-70f9c.firebaseapp.com",
+        databaseURL: "https://wheel-decide-70f9c-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "wheel-decide-70f9c",
+        storageBucket: "wheel-decide-70f9c.firebasestorage.app",
+        messagingSenderId: "570584620154",
+        appId: "1:570584620154:web:0ee1ac7a1944eb7922afc3"
+    };
+    
+    // ✅ Twój adres Backend z Render.com (pobrany ze zdjęcia)
+    const API_URL = "https://wheel-kbe8.onrender.com"; 
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const provider = new GoogleAuthProvider();
+
+    let playerToken = null;
+    let currentGameId = null;
+    let playerData = {};
+
+    window.switchView = (id) => {
+        document.querySelectorAll('.container > div').forEach(d => d.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+    
+    window.showCreator = () => window.switchView('view-creator');
+
+    window.joinGame = async () => {
+        const id = document.getElementById('joinGameId').value.trim().toUpperCase();
+        if(!id) return alert("Podaj kod gry!");
+        try {
+            const res = await fetch(`${API_URL}/api/game/${id}/meta`);
+            if(!res.ok) throw new Error("Nie znaleziono takiej gry.");
+            const data = await res.json();
+            currentGameId = id;
+            setupGameInterface(id, data.config);
+            window.switchView('view-game');
+        } catch(e) { alert(e.message); }
+    };
+
+    function setupGameInterface(id, config) {
+        document.getElementById('displayGameId').innerText = id;
+        const form = document.getElementById('player-auth-form');
+        const iName = document.getElementById('inputName');
+        const iEmail = document.getElementById('inputEmail');
+        const btnG = document.getElementById('btnGoogleJoin');
+        const btnS = document.getElementById('btnSubmitPlayer');
+
+        form.classList.remove('hidden');
+        document.getElementById('wheel-area').classList.add('hidden');
+        iName.classList.add('hidden'); iEmail.classList.add('hidden'); btnG.classList.add('hidden'); btnS.classList.add('hidden');
+
+        if(config.authType === 'google') {
+            btnG.classList.remove('hidden');
+            btnG.onclick = async () => {
+                try {
+                    const res = await signInWithPopup(auth, provider);
+                    playerToken = await res.user.getIdToken();
+                    startGameLogic(id);
+                } catch(e) { alert("Błąd logowania: " + e.message); }
+            };
+        } else {
+            btnS.classList.remove('hidden');
+            if(config.authType === 'name') iName.classList.remove('hidden');
+            if(config.authType === 'email') iEmail.classList.remove('hidden');
+        }
+    }
+
+    window.submitPlayerData = () => {
+        const name = document.getElementById('inputName').value;
+        const email = document.getElementById('inputEmail').value;
+        playerData = { name, email };
+        startGameLogic(currentGameId);
+    };
+
+    function startGameLogic(gameId) {
+        document.getElementById('player-auth-form').classList.add('hidden');
+        document.getElementById('wheel-area').classList.remove('hidden');
+        listenToGameEvents(gameId);
+    }
+
+    document.getElementById('creatorLoginBtn').addEventListener('click', async () => {
+        try {
+            const res = await signInWithPopup(auth, provider);
+            playerToken = await res.user.getIdToken();
+            document.getElementById('creator-login').classList.add('hidden');
+            document.getElementById('creator-form').classList.remove('hidden');
+            if(document.getElementById('prizes-list').children.length === 0) { addPrizeField(); addPrizeField(); }
+        } catch(e) { alert(e.message); }
+    });
+
+    window.addPrizeField = () => {
+        const div = document.createElement('div');
+        div.className = 'prize-row';
+        div.innerHTML = `<input placeholder="Widoczne (np. 1)" class="p-num" style="width:30%"><input placeholder="Ukryte (np. Laptop)" class="p-sec">`;
+        document.getElementById('prizes-list').appendChild(div);
+    };
+
+    window.createGame = async () => {
+        const prizes = {};
+        document.querySelectorAll('.prize-row').forEach((row, i) => {
+            const num = row.querySelector('.p-num').value.trim();
+            const sec = row.querySelector('.p-sec').value.trim();
+            if(num && sec) prizes[`prize_${i}`] = { number: num, secret: sec, wonBy: null };
+        });
+        if(Object.keys(prizes).length < 2) return alert("Dodaj min. 2 nagrody!");
+
+        const config = { authType: document.getElementById('newAuthType').value, spinLimit: parseInt(document.getElementById('newLimit').value) };
+
+        try {
+            const res = await fetch(`${API_URL}/api/create-game`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${playerToken}` },
+                body: JSON.stringify({ config, prizes })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert(`✅ GRA UTWORZONA!\n\nKOD GRY: ${data.gameId}`);
+                window.switchView('view-home');
+            } else { alert("Błąd: " + data.error); }
+        } catch(e) { alert("Błąd połączenia z serwerem"); }
+    };
+
+    let prizesArr = [];
+    let currentRotation = 0;
+    const canvas = document.getElementById('wheel');
+    const ctx = canvas.getContext('2d');
+
+    function listenToGameEvents(gameId) {
+        onValue(ref(db, `games/${gameId}/prizes`), (snap) => {
+            prizesArr = [];
+            if(snap.exists()) snap.forEach(c => prizesArr.push({ ...c.val(), id: c.key }));
+            drawWheel();
+        });
+        onValue(ref(db, `games/${gameId}/gameState`), (snap) => {
+            const state = snap.val();
+            if(state && state.spinning) {
+                document.getElementById('spinBtn').disabled = true;
+                document.getElementById('status-text').innerText = `Kręci: ${state.spinnerName}...`;
+                const idx = prizesArr.findIndex(p => p.id === state.prizeId);
+                if(idx > -1) {
+                    const arc = 360 / prizesArr.length;
+                    const target = 360 - (idx * arc) - (arc/2) + 270;
+                    const rot = currentRotation + 1800 + (target - (currentRotation%360));
+                    canvas.style.transform = `rotate(${rot}deg)`;
+                    canvas.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)";
+                    currentRotation = rot;
+                }
+            } else {
+                document.getElementById('spinBtn').disabled = false;
+                document.getElementById('status-text').innerText = "Twoja kolej!";
+            }
+        });
+    }
+
+    function drawWheel() {
+        if(!prizesArr.length) return;
+        const arc = (2*Math.PI)/prizesArr.length;
+        const colors = ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6'];
+        ctx.clearRect(0,0,500,500);
+        prizesArr.forEach((p, i) => {
+            const angle = i*arc;
+            ctx.beginPath();
+            ctx.fillStyle = p.wonBy ? '#bdc3c7' : colors[i % colors.length];
+            ctx.moveTo(250,250);
+            ctx.arc(250,250,250, angle, angle+arc);
+            ctx.fill();
+            ctx.stroke();
+            ctx.save();
+            ctx.translate(250,250);
+            ctx.rotate(angle + arc/2);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 24px Arial";
+            ctx.fillText(p.number, 140, 10);
+            ctx.restore();
+        });
+    }
+
+    document.getElementById('spinBtn').addEventListener('click', async () => {
+        const headers = { 'Content-Type': 'application/json' };
+        if(playerToken) headers['Authorization'] = `Bearer ${playerToken}`;
+        try {
+            const res = await fetch(`${API_URL}/api/spin`, { 
+                method: 'POST', headers, body: JSON.stringify({ gameId: currentGameId, userData: playerData }) 
+            });
+            const data = await res.json();
+            if(!data.success) alert(data.error);
+            else setTimeout(() => alert(`🎉 WYGRANA: ${data.secretPrize}`), 5000);
+        } catch(e) { alert("Błąd połączenia"); }
+    });
+</script>
+</body>
+</html>
