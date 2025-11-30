@@ -20,6 +20,7 @@
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: #f39c12; color: white; }
         .btn-outline { background: transparent; border: 2px solid #bdc3c7; color: #7f8c8d; }
         .btn-fb { background: var(--fb); color: white; }
         .btn-google { background: var(--google); color: white; }
@@ -51,6 +52,8 @@
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         
         .social-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        
+        /* TABLES */
         .audit-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         .audit-table th, .audit-table td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
         .audit-table th { background: #f8f9fa; }
@@ -77,7 +80,7 @@
             <h3>Twoje Konto</h3>
             
             <div id="auth-logged-out">
-                <p>Zaloguj się, aby tworzyć gry lub zachować historię wygranych.</p>
+                <p>Zaloguj się, aby tworzyć gry lub zobaczyć historię swoich wygranych.</p>
                 <div class="social-btns">
                     <button onclick="login('google')" class="btn-google">Google</button>
                     <button onclick="login('facebook')" class="btn-fb">Facebook</button>
@@ -116,8 +119,21 @@
                 <option value="email">Wymagany Email</option>
                 <option value="google">Konto Google/FB (Najbezpieczniejsza)</option>
             </select>
-            <label>Limit losowań:</label>
+            
+            <label>Limit losowań na osobę:</label>
             <input type="number" id="newLimit" value="1" min="1">
+
+            <label style="font-weight:bold; margin-top:10px; display:block;">Styl Koła:</label>
+            <select id="newColorTheme">
+                <option value="vibrant">🌈 Klasyczna (Żywe Kolory)</option>
+                <option value="corporate">👔 Biznesowa (Granat i Szarość)</option>
+                <option value="warm">🔥 Ogień (Czerwienie i Pomarańcze)</option>
+                <option value="pastel">🌸 Pastelowa (Delikatne)</option>
+                <option value="neon">⚡ Neon / Cyberpunk</option>
+                <option value="gold">🏆 Premium Gold (Złoto i Czerń)</option>
+                <option value="forest">🌲 Natura (Zielenie i Brązy)</option>
+            </select>
+
             <h3>Nagrody</h3>
             <div id="prizes-list"></div>
             <button onclick="addPrizeField()" class="btn-outline" style="width:100%">+ Dodaj nagrodę</button>
@@ -192,7 +208,16 @@
         <div style="text-align: left; margin-top: 20px;">
             <h3>🏆 Wyniki</h3>
             <div style="overflow-x:auto;">
-                <table class="audit-table"><thead><tr><th>Kto</th><th>Nagroda</th><th>Czas</th></tr></thead><tbody id="history-prizes-body"></tbody></table>
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>Kto</th>
+                            <th>Email</th> <th>Nagroda</th>
+                            <th>Czas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-prizes-body"></tbody>
+                </table>
             </div>
             <h3 style="margin-top: 20px;">📜 Logi</h3>
             <div style="overflow-x:auto; max-height: 200px; overflow-y: auto; border: 1px solid #eee;">
@@ -203,13 +228,14 @@
 
     <footer>
         <p>Built with ❤️ by <strong>LigeroIT</strong></p>
-        <p>
+        <p style="font-size: 0.8rem;">
             &copy; 2025 LigeroIT. 
-            <a href="privacy.html" target="_blank" style="color: inherit; text-decoration: underline;">Polityka Prywatności</a>
+            <a href="privacy.html" target="_blank" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+            &nbsp;|&nbsp;
+            <a href="terms.html" target="_blank" style="color: inherit; text-decoration: underline;">Terms of Service</a>
         </p>
     </footer>
 </div>
-
 
 <div id="custom-modal" class="modal-overlay">
     <div class="modal-content">
@@ -239,7 +265,17 @@
     let playerData = {};
     let activePrizes = [];
     let currentRotation = 0; 
-    const COLORS = ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e'];
+
+    // PALETY KOLORÓW
+    const PALETTES = {
+        vibrant: ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6', '#1abc9c', '#e67e22'],
+        corporate: ['#2c3e50', '#2980b9', '#7f8c8d', '#bdc3c7', '#34495e', '#16a085'],
+        warm: ['#c0392b', '#e74c3c', '#d35400', '#e67e22', '#f39c12', '#f1c40f'],
+        pastel: ['#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#bae1ff', '#eecbff'],
+        neon: ['#ff00ff', '#00ffff', '#00ff00', '#ffff00', '#ff0055', '#7b00ff'],
+        gold: ['#d4af37', '#2c3e50', '#f1c40f', '#1a1a1a', '#ffd700', '#444444'],
+        forest: ['#27ae60', '#2ecc71', '#16a085', '#f1c40f', '#d35400', '#8e44ad']
+    };
 
     // --- UI HELPERS ---
     window.showModal = (t, b, err=false) => {
@@ -260,52 +296,36 @@
         document.getElementById('tab-user').classList.add('hidden');
         document.getElementById('btn-tab-admin').classList.remove('active');
         document.getElementById('btn-tab-user').classList.remove('active');
-        
         document.getElementById(id).classList.remove('hidden');
         document.getElementById(`btn-${id}`).classList.add('active');
-        
         if(id === 'tab-admin') loadCreatedGames();
         if(id === 'tab-user') loadMyWinnings();
     }
 
-    // --- AUTHENTICATION ---
+    // --- AUTH ---
     window.login = async (providerName) => {
-        try {
-            await signInWithPopup(auth, providers[providerName]);
-        } catch (e) { showModal("Błąd logowania", e.message, true); }
+        try { await signInWithPopup(auth, providers[providerName]); } catch (e) { showModal("Błąd logowania", e.message, true); }
     };
     
     window.logout = async () => {
-        // Czyścimy pamięć gościa przy wylogowaniu
         localStorage.removeItem('wheel_guest_data');
         await signOut(auth);
-        window.location.reload(); // Odświeżamy dla czystego stanu
+        window.location.reload();
     };
 
     onAuthStateChanged(auth, async (user) => {
         if (user && !user.isAnonymous) {
-            // ZALOGOWANY NORMALNIE (Google/FB)
             playerToken = await user.getIdToken();
             document.getElementById('auth-logged-out').classList.add('hidden');
             document.getElementById('auth-logged-in').classList.remove('hidden');
             document.getElementById('userName').innerText = user.displayName || user.email;
-            
-            // Jeśli jesteśmy w grze
-            if(!document.getElementById('view-game').classList.contains('hidden')) {
-                refreshGameView(currentGameId);
-            } else {
-                loadCreatedGames();
-            }
+            if(!document.getElementById('view-game').classList.contains('hidden')) refreshGameView(currentGameId);
+            else loadCreatedGames();
         } else {
-            // WYLOGOWANY lub ANONIM
-            // Sprawdzamy czy był tu anonim wcześniej
             if (!user) playerToken = null;
             document.getElementById('auth-logged-in').classList.add('hidden');
             document.getElementById('auth-logged-out').classList.remove('hidden');
-            
-            if(!document.getElementById('view-game').classList.contains('hidden')) {
-                refreshGameView(currentGameId);
-            }
+            if(!document.getElementById('view-game').classList.contains('hidden')) refreshGameView(currentGameId);
         }
     });
 
@@ -372,7 +392,13 @@
             const n=el.value, s=document.querySelectorAll('.p-sec')[i].value; if(n&&s) prizes[`p_${i}`]={number:n, secret:s, wonBy:null};
         });
         if(Object.keys(prizes).length<2) return showModal("Błąd","Min 2 nagrody");
-        const config={authType:document.getElementById('newAuthType').value, spinLimit:document.getElementById('newLimit').value};
+        
+        const theme = document.getElementById('newColorTheme').value || 'vibrant';
+        const config={
+            authType:document.getElementById('newAuthType').value, 
+            spinLimit:document.getElementById('newLimit').value,
+            theme: theme
+        };
         try {
             const res=await fetch(`${API_URL}/api/create-game`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${playerToken}`},body:JSON.stringify({config,prizes})});
             const d=await res.json();
@@ -400,7 +426,6 @@
         ['player-auth-form','wheel-area','already-played-view','player-logged-in-msg','player-guest-form'].forEach(i=>document.getElementById(i).classList.add('hidden'));
         ['inputName','inputEmail','btnSubmitPlayer','social-login-section'].forEach(i=>document.getElementById(i).classList.add('hidden'));
 
-        // 1. ZALOGOWANY UŻYTKOWNIK
         if(auth.currentUser && !auth.currentUser.isAnonymous) {
             document.getElementById('player-auth-form').classList.remove('hidden');
             document.getElementById('player-logged-in-msg').classList.remove('hidden');
@@ -408,19 +433,15 @@
             return;
         }
 
-        // 2. GOŚĆ Z PAMIĘCI (LOCALSTORAGE)
         const guestData = JSON.parse(localStorage.getItem('wheel_guest_data'));
         if (guestData && auth.currentUser && auth.currentUser.isAnonymous) {
             document.getElementById('player-auth-form').classList.remove('hidden');
             document.getElementById('player-logged-in-msg').classList.remove('hidden');
             document.getElementById('playerLoggedInName').innerText = guestData.name || "Gość";
-            
-            // Auto-load playerData from storage
             playerData = guestData;
             return;
         }
 
-        // 3. NOWY GOŚĆ (FORMULARZ)
         document.getElementById('player-auth-form').classList.remove('hidden');
         document.getElementById('player-guest-form').classList.remove('hidden');
         const config = window.currentConfig;
@@ -436,19 +457,15 @@
     }
 
     window.checkAndPlay = async () => {
-        // Jeśli nie mamy danych (bo jesteśmy zalogowani/gość z pamięci), pobierz z formularza
         if (!playerData.name) {
             playerData = { 
                 name: document.getElementById('inputName').value, 
                 email: document.getElementById('inputEmail').value 
             };
         }
-
-        // DLA GOŚCI: Jeśli nie zalogowany, zrób anonim i zapisz do pamięci
         if (!auth.currentUser) {
             try {
                 await signInAnonymously(auth);
-                // ZAPISZ W PAMIĘCI!
                 localStorage.setItem('wheel_guest_data', JSON.stringify(playerData));
             } catch(e) { console.error("Anon auth failed", e); }
         }
@@ -513,8 +530,12 @@
         if(count===0) { ctx.clearRect(0,0,500,500); return; }
         const arc = (2*Math.PI)/count; const rad=250; ctx.clearRect(0,0,500,500);
         
+        // WYBÓR PALETY KOLORÓW
+        const themeKey = window.currentConfig?.theme || 'vibrant';
+        const currentPalette = PALETTES[themeKey] || PALETTES['vibrant'];
+
         activePrizes.forEach((p,i)=>{
-            ctx.beginPath(); ctx.fillStyle = COLORS[i%COLORS.length];
+            ctx.beginPath(); ctx.fillStyle = currentPalette[i%currentPalette.length];
             ctx.moveTo(rad,rad); ctx.arc(rad,rad,rad,i*arc,(i+1)*arc); ctx.fill(); ctx.stroke();
             ctx.save(); ctx.translate(rad,rad); ctx.rotate(i*arc + arc/2);
             ctx.fillStyle="white"; ctx.font="bold 32px Segoe UI"; ctx.textAlign="right";
@@ -545,7 +566,7 @@
         } catch(e) { showModal("Błąd","Sieć"); }
     }
 
-    // --- HISTORY ---
+    // --- HISTORY Z EMAILEM ---
     window.copyLink=(id)=>{navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?game=${id}`);showModal("OK","Skopiowano")};
     window.shareGame=()=>window.copyLink(currentGameId);
     window.showHistory=async(id)=>{
@@ -561,7 +582,16 @@
         const d=await r.json();
         const pB=document.getElementById('history-prizes-body'); pB.innerHTML='';
         const aB=document.getElementById('history-audit-body'); aB.innerHTML='';
-        d.prizes.filter(p=>p.wonBy).forEach(p=>pB.innerHTML+=`<tr><td>${p.wonByName}</td><td>${p.secret}</td><td>${new Date(p.wonAt).toLocaleTimeString()}</td></tr>`);
+        
+        // ✅ Zaktualizowana tabela z Emailem
+        d.prizes.filter(p=>p.wonBy).forEach(p=>pB.innerHTML+=`
+            <tr>
+                <td>${p.wonByName || 'Anonim'}</td>
+                <td>${p.wonByEmail || '-'}</td>
+                <td>${p.secret}</td>
+                <td>${new Date(p.wonAt).toLocaleTimeString()}</td>
+            </tr>`);
+            
         d.audit.forEach(a=>aB.innerHTML+=`<tr><td>${a.action}</td><td>${a.description}</td></tr>`);
     };
     window.onload=()=>{ const p=new URLSearchParams(window.location.search).get('game'); if(p){ document.getElementById('joinGameId').value=p; joinGame(p); }};
