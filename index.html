@@ -212,7 +212,8 @@
                     <thead>
                         <tr>
                             <th>Kto</th>
-                            <th>Email</th> <th>Nagroda</th>
+                            <th>Email</th>
+                            <th>Nagroda</th>
                             <th>Czas</th>
                         </tr>
                     </thead>
@@ -387,74 +388,44 @@
         d.innerHTML=`<input class="p-num" style="width:30%" placeholder="Nr"><input class="p-sec" placeholder="Nagroda">`;
         document.getElementById('prizes-list').appendChild(d);
     }
-    // --- KREATOR (ZAKTUALIZOWANY POPUP) ---
     window.createGame = async () => {
-        const prizes = {};
-        document.querySelectorAll('.p-num').forEach((el, i) => {
-            const n = el.value, s = document.querySelectorAll('.p-sec')[i].value;
-            if (n && s) prizes[`p_${i}`] = { number: n, secret: s, wonBy: null };
+        const prizes={}; document.querySelectorAll('.p-num').forEach((el,i)=>{ 
+            const n=el.value, s=document.querySelectorAll('.p-sec')[i].value; if(n&&s) prizes[`p_${i}`]={number:n, secret:s, wonBy:null};
         });
-
-        if (Object.keys(prizes).length < 2) return showModal("Błąd", "Dodaj min. 2 nagrody", true);
-
+        if(Object.keys(prizes).length<2) return showModal("Błąd","Min 2 nagrody");
+        
         const theme = document.getElementById('newColorTheme').value || 'vibrant';
-        const config = {
-            authType: document.getElementById('newAuthType').value,
-            spinLimit: document.getElementById('newLimit').value,
+        const config={
+            authType:document.getElementById('newAuthType').value, 
+            spinLimit:document.getElementById('newLimit').value,
             theme: theme
         };
-
         try {
-            const res = await fetch(`${API_URL}/api/create-game`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${playerToken}` },
-                body: JSON.stringify({ config, prizes })
-            });
-            const d = await res.json();
-
-            if (d.success) {
-                // Generujemy link do gry
+            const res=await fetch(`${API_URL}/api/create-game`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${playerToken}`},body:JSON.stringify({config,prizes})});
+            const d=await res.json();
+            if(d.success) { 
                 const gameUrl = `${window.location.origin}${window.location.pathname}?game=${d.gameId}`;
-
-                // 1. Próba automatycznego kopiowania do schowka
-                navigator.clipboard.writeText(gameUrl).catch(err => console.log('Auto-copy failed', err));
-
-                loadCreatedGames(); // Odśwież listę w tle
+                navigator.clipboard.writeText(gameUrl).catch(err => console.log('Copy fail'));
+                loadCreatedGames(); 
                 switchView('view-home');
-
-                // 2. Wyświetlenie rozbudowanego Modala
+                
                 const modalContent = `
                     <div style="text-align:center;">
                         <p style="font-size:1.1rem; color:#555;">Gra została utworzona!</p>
-                        
                         <div style="background:#f0f2f5; padding:15px; border-radius:8px; margin:15px 0;">
                             <span style="font-size:0.8rem; text-transform:uppercase; color:#888; font-weight:bold;">Kod Gry</span><br>
                             <strong style="font-size:2rem; letter-spacing:3px; color:var(--primary);">${d.gameId}</strong>
                         </div>
-
-                        <p style="margin-bottom:5px; font-size:0.9rem;">Link dla uczestników:</p>
-                        <input type="text" value="${gameUrl}" readonly onclick="this.select()" 
-                               style="width:100%; text-align:center; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:20px; background:#fff; font-family:monospace;">
-
-                        <div style="display:flex; gap:10px; justify-content:center;">
-                            <button onclick="navigator.clipboard.writeText('${gameUrl}'); this.innerText='✅ Skopiowano!'" class="btn-outline" style="flex:1;">
-                                📋 Kopiuj Link
-                            </button>
-                            
-                            <a href="${gameUrl}" target="_blank" style="text-decoration:none; flex:1;">
-                                <button class="btn-success" style="width:100%;">🚀 Otwórz Grę</button>
-                            </a>
+                        <p style="margin-bottom:5px; font-size:0.9rem;">Link:</p>
+                        <input type="text" value="${gameUrl}" readonly onclick="this.select()" style="width:100%; text-align:center; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:20px; font-family:monospace;">
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="navigator.clipboard.writeText('${gameUrl}')" class="btn-outline" style="flex:1;">📋 Kopiuj</button>
+                            <a href="${gameUrl}" target="_blank" style="flex:1;"><button class="btn-success" style="width:100%;">🚀 Otwórz</button></a>
                         </div>
-                    </div>
-                `;
-
+                    </div>`;
                 showModal("Sukces! 🎉", modalContent);
-            } else {
-                showModal("Błąd", d.error, true);
             }
-        } catch (e) {
-            showModal("Błąd", "Problem z połączeniem sieciowym", true);
-        }
+        } catch(e){ showModal("Błąd","Sieć"); }
     }
 
     // --- GAME LOGIC ---
@@ -501,19 +472,38 @@
             document.getElementById('social-login-section').classList.remove('hidden');
         } else {
             document.getElementById('btnSubmitPlayer').classList.remove('hidden');
-            if(config.authType === 'name') document.getElementById('inputName').classList.remove('hidden');
-            if(config.authType === 'email') document.getElementById('inputEmail').classList.remove('hidden');
             document.getElementById('social-login-section').classList.remove('hidden');
+            
+            document.getElementById('inputName').classList.remove('hidden');
+            document.getElementById('inputEmail').classList.remove('hidden');
+
+            if(config.authType === 'name') {
+                document.getElementById('inputName').placeholder = "Twoje Imię (Wymagane)";
+                document.getElementById('inputEmail').placeholder = "Twój E-mail (Opcjonalnie)";
+            } 
+            else if (config.authType === 'email') {
+                document.getElementById('inputName').placeholder = "Twoje Imię (Do wyświetlenia)";
+                document.getElementById('inputEmail').placeholder = "Twój E-mail (Wymagany)";
+            }
         }
     }
 
     window.checkAndPlay = async () => {
+        // Jeśli nie mamy danych (bo jesteśmy zalogowani/gość z pamięci), pobierz z formularza
         if (!playerData.name) {
             playerData = { 
-                name: document.getElementById('inputName').value, 
-                email: document.getElementById('inputEmail').value 
+                name: document.getElementById('inputName').value.trim(), 
+                email: document.getElementById('inputEmail').value.trim() 
             };
         }
+
+        // Walidacja
+        const config = window.currentConfig;
+        if(!auth.currentUser || auth.currentUser.isAnonymous) {
+            if(config.authType === 'email' && (!playerData.email || !playerData.email.includes('@'))) return showModal("Błąd", "Podaj poprawny email");
+            if(config.authType === 'name' && !playerData.name) return showModal("Błąd", "Podaj imię");
+        }
+
         if (!auth.currentUser) {
             try {
                 await signInAnonymously(auth);
@@ -581,7 +571,6 @@
         if(count===0) { ctx.clearRect(0,0,500,500); return; }
         const arc = (2*Math.PI)/count; const rad=250; ctx.clearRect(0,0,500,500);
         
-        // WYBÓR PALETY KOLORÓW
         const themeKey = window.currentConfig?.theme || 'vibrant';
         const currentPalette = PALETTES[themeKey] || PALETTES['vibrant'];
 
@@ -617,7 +606,7 @@
         } catch(e) { showModal("Błąd","Sieć"); }
     }
 
-    // --- HISTORY Z EMAILEM ---
+    // --- HISTORY ---
     window.copyLink=(id)=>{navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?game=${id}`);showModal("OK","Skopiowano")};
     window.shareGame=()=>window.copyLink(currentGameId);
     window.showHistory=async(id)=>{
@@ -634,7 +623,6 @@
         const pB=document.getElementById('history-prizes-body'); pB.innerHTML='';
         const aB=document.getElementById('history-audit-body'); aB.innerHTML='';
         
-        // ✅ Zaktualizowana tabela z Emailem
         d.prizes.filter(p=>p.wonBy).forEach(p=>pB.innerHTML+=`
             <tr>
                 <td>${p.wonByName || 'Anonim'}</td>

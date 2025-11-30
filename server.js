@@ -39,7 +39,7 @@ async function logAudit(gameId, action, description, meta = {}) {
     } catch (e) { console.error("Audit Log Error:", e); }
 }
 
-// Middleware weryfikacji tokenu
+// Middleware weryfikacji tokenu (opcjonalny - przepuszcza gości)
 async function verifyTokenOptional(req, res, next) {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (token) {
@@ -73,12 +73,13 @@ app.post('/api/create-game', verifyTokenOptional, async (req, res) => {
 
     await db.ref(`games/${gameId}`).set({
         adminUid: req.user.uid,
-        config: config, // Tutaj zapisuje się też 'theme' (kolory)
+        config: config, 
         prizes: prizes,
         createdAt: Date.now()
     });
 
-    await logAudit(gameId, "GAME_CREATED", `Gra utworzona przez ${req.user.email || req.user.uid}`);
+    const creatorName = req.user.email || req.user.name || req.user.uid;
+    await logAudit(gameId, "GAME_CREATED", `Gra utworzona przez ${creatorName}`);
 
     res.json({ success: true, gameId });
 });
@@ -108,12 +109,11 @@ app.get('/api/my-created-games', verifyTokenOptional, async (req, res) => {
     }
 });
 
-// 3. USER: MOJE WYGRANE (Gry w których brałem udział)
+// 3. USER: MOJE WYGRANE
 app.get('/api/my-winnings', verifyTokenOptional, async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Zaloguj się, aby zobaczyć historię." });
     
     try {
-        // Pobieramy ostatnie 100 gier (dla MVP wystarczy, w produkcji lepiej użyć innej struktury DB)
         const snapshot = await db.ref('games').limitToLast(100).once('value'); 
         const winnings = [];
 
@@ -149,12 +149,11 @@ app.get('/api/game/:gameId/meta', async (req, res) => {
     res.json({ config: snap.val() });
 });
 
-// 5. SPRAWDZENIE STATUSU GRACZA (Czy już grał?)
+// 5. SPRAWDZENIE STATUSU GRACZA
 app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     let playerId = null;
 
-    // Ustalanie ID gracza
     if (req.user) {
         playerId = req.user.uid;
     } else if (userData?.email) {
@@ -165,7 +164,6 @@ app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) =>
 
     if (!playerId) return res.json({ hasPlayed: false });
 
-    // Szukanie wygranej w tej grze
     const prizesSnap = await db.ref(`games/${gameId}/prizes`).once('value');
     let myPrize = null;
     
@@ -180,7 +178,7 @@ app.post('/api/game/:gameId/my-result', verifyTokenOptional, async (req, res) =>
     res.json({ hasPlayed: !!myPrize, prize: myPrize });
 });
 
-// 6. ADMIN DETALE (Pełna historia i audyt)
+// 6. ADMIN DETALE
 app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Zaloguj się" });
     const { gameId } = req.params;
@@ -198,7 +196,7 @@ app.get('/api/game/:gameId/admin-details', verifyTokenOptional, async (req, res)
     });
 });
 
-// 7. LOSOWANIE (SPIN) - Z ZAPISYWANIEM EMAILA
+// 7. LOSOWANIE (SPIN) - POPRAWIONA WERSJA DLA GOŚCI
 app.post('/api/spin', verifyTokenOptional, async (req, res) => {
     const { gameId, userData } = req.body;
     if (!gameId) return res.status(400).json({ error: "Brak ID" });
@@ -217,14 +215,13 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         // A. Identyfikacja
         if (req.user) {
+            // Zalogowany (Google/FB/Anonim Firebase)
             playerId = req.user.uid;
-            playerName = req.user.name || req.user.email;
-            playerEmail = req.user.email;
+            playerName = req.user.name || req.user.email || "Gość";
+            playerEmail = req.user.email || null; // Może być null dla anonima
         } else {
-            // Walidacja dla gości
-            if (config.authType === 'google' || config.authType === 'facebook') {
-                 return res.status(401).json({ error: "Wymagane logowanie kontem społecznościowym." });
-            }
+            // Bez tokenu (Legacy fallback, jeśli ktoś ominął frontend)
+            if (config.authType === 'google') return res.status(401).json({ error: "Wymagane logowanie." });
             
             if (config.authType === 'email') {
                 if (!userData?.email) return res.status(400).json({ error: "Podaj email" });
@@ -235,14 +232,18 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
                 if (!userData?.name) return res.status(400).json({ error: "Podaj imię" });
                 playerId = userData.name.toLowerCase().trim();
                 playerName = userData.name;
-                playerEmail = userData.email || "-";
+                playerEmail = userData.email || null;
             }
         }
+
+        // Nadpisanie nazwy z formularza jeśli jest dostępna (nawet dla zalogowanego anonimowo)
+        if (userData?.name) playerName = userData.name;
+        if (userData?.email) playerEmail = userData.email;
 
         // B. Limity
         const userHistory = game.users?.[playerId] || { spinsUsed: 0 };
         if (userHistory.spinsUsed >= config.spinLimit) {
-            await logAudit(gameId, "SPIN_BLOCKED", `Gracz ${playerName} próbował przekroczyć limit`, { playerId });
+            await logAudit(gameId, "SPIN_BLOCKED", `Gracz ${playerName} zablokowany (limit)`, { playerId });
             return res.status(403).json({ error: "Limit wykorzystany!", code: "LIMIT_REACHED" });
         }
 
@@ -254,11 +255,11 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         const winnerPrize = available[Math.floor(Math.random() * available.length)];
 
-        // D. Zapis (W tym email)
+        // D. Zapis
         const updates = {};
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonBy`] = playerId;
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByName`] = playerName;
-        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByEmail`] = playerEmail; // ZAPISUJEMY EMAIL
+        updates[`games/${gameId}/prizes/${winnerPrize.id}/wonByEmail`] = playerEmail || '-'; // Myślnik jeśli brak
         updates[`games/${gameId}/prizes/${winnerPrize.id}/wonAt`] = Date.now();
         updates[`games/${gameId}/users/${playerId}/spinsUsed`] = userHistory.spinsUsed + 1;
         
@@ -271,7 +272,8 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
 
         await db.ref().update(updates);
         
-        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} (${playerEmail || 'brak email'}) wygrał: ${winnerPrize.number}`, { 
+        const auditEmail = playerEmail || 'brak email';
+        await logAudit(gameId, "SPIN_SUCCESS", `${playerName} (${auditEmail}) wygrał: ${winnerPrize.number}`, { 
             prizeSecret: winnerPrize.secret 
         });
 
@@ -280,7 +282,7 @@ app.post('/api/spin', verifyTokenOptional, async (req, res) => {
         res.json({ success: true, number: winnerPrize.number, secretPrize: winnerPrize.secret });
 
     } catch (e) {
-        console.error(e);
+        console.error("SPIN ERROR:", e);
         res.status(500).json({ error: "Błąd serwera" });
     }
 });
