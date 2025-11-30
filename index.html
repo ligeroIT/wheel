@@ -4,46 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wheel SaaS - LigeroIT</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/winwheel@2.8.0/dist/Winwheel.min.js"></script>
+
     <style>
-        :root { --primary: #3498db; --success: #2ecc71; --danger: #e74c3c; --dark: #2c3e50; --light: #f4f7f6; }
+        :root { --primary: #3498db; --success: #2ecc71; --danger: #e74c3c; --dark: #2c3e50; --light: #f4f7f6; --warning: #f39c12; }
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: var(--light); color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; min-height: 100vh; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); flex: 1; width: 100%; box-sizing: border-box; }
-        h1, h2 { color: var(--dark); margin-bottom: 20px; }
+        h1, h2, h3 { color: var(--dark); margin-bottom: 20px; }
         .hidden { display: none !important; }
 
-        /* BUTTONS & INPUTS */
+        /* UI ELEMENTS */
         button { padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer; font-size: 1rem; font-weight: 600; transition: 0.2s; margin: 5px; }
         button:hover { transform: translateY(-2px); filter: brightness(1.1); }
         button:disabled { background: #ccc; cursor: not-allowed; transform: none; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
         .btn-outline { background: transparent; border: 2px solid #bdc3c7; color: #7f8c8d; }
-        .btn-sm { padding: 5px 10px; font-size: 0.85rem; }
+        .btn-sm { padding: 6px 12px; font-size: 0.85rem; }
         
         input, select { padding: 12px; width: 100%; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         input:focus { border-color: var(--primary); outline: none; }
 
-        /* WHEEL CANVAS */
-        #canvas-wrapper { position: relative; max-width: 450px; margin: 20px auto; }
-        canvas { width: 100%; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15)); }
-        .arrow { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); 
-                 border-top: 35px solid var(--danger); border-left: 20px solid transparent; border-right: 20px solid transparent; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        /* CANVAS AREA */
+        #canvas-wrapper { 
+            position: relative; 
+            max-width: 450px; 
+            margin: 20px auto; 
+            display: flex; 
+            justify-content: center;
+        }
+        /* Wskazówka */
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid var(--danger);
+            z-index: 10;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3));
+        }
 
-        /* MY GAMES LIST */
+        /* TABLES & LISTS */
         .game-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid var(--primary); text-align: left; gap: 10px; }
-        .game-info strong { font-size: 1.1rem; color: var(--dark); }
-        .game-actions { display: flex; gap: 5px; }
+        .audit-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        .audit-table th, .audit-table td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        .audit-table th { background: #f8f9fa; }
+        .audit-badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: white; }
+        .badge-create { background: var(--primary); } .badge-spin { background: var(--success); } .badge-error { background: var(--danger); }
 
-        /* MODAL (POPUP) */
+        /* MODAL */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; visibility: hidden; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; visibility: visible; }
-        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; transform: scale(0.8); transition: 0.3s; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; text-align: center; transform: scale(0.8); transition: 0.3s; box-shadow: 0 20px 50px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto; }
         .modal-overlay.active .modal-content { transform: scale(1); }
         .modal-title { font-size: 1.5rem; margin-bottom: 10px; font-weight: bold; }
-        .modal-body { font-size: 1.1rem; color: #555; margin-bottom: 20px; line-height: 1.5; word-break: break-word; }
+        .result-card { background: #d4edda; border: 2px solid #c3e6cb; color: #155724; padding: 30px; border-radius: 12px; animation: popIn 0.5s; }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        /* FOOTER */
         footer { margin-top: 30px; font-size: 0.8rem; color: #aaa; border-top: 1px solid #eee; padding-top: 20px; }
     </style>
 </head>
@@ -53,7 +78,6 @@
 
     <div id="view-home">
         <h1>Generator Kół Fortuny 🎡</h1>
-        
         <div style="background: white; border: 2px dashed #eee; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
             <h3>Masz kod gry?</h3>
             <div style="display: flex; gap: 10px;">
@@ -61,22 +85,18 @@
                 <button onclick="joinGame()" class="btn-success">Graj</button>
             </div>
         </div>
-
         <div style="background: #f8f9fa; padding: 20px; border-radius: 12px;">
             <h3>Panel Organizatora</h3>
             <div id="admin-logged-out">
-                <p>Zaloguj się, aby tworzyć gry i zarządzać nimi.</p>
+                <p>Zaloguj się, aby zarządzać.</p>
                 <button id="homeLoginBtn" class="btn-primary">Zaloguj przez Google</button>
             </div>
             <div id="admin-logged-in" class="hidden">
                 <p>Witaj, <strong id="adminName"></strong>!</p>
                 <button onclick="showCreator()" class="btn-primary">➕ Nowa Gra</button>
-                
                 <div style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px;">
-                    <h4 style="margin-bottom: 10px; text-align: left;">Twoje Gry:</h4>
-                    <div id="my-games-list">
-                        <p>Ładowanie listy...</p>
-                    </div>
+                    <h4 style="text-align: left;">Twoje Gry:</h4>
+                    <div id="my-games-list"><p>Ładowanie...</p></div>
                 </div>
             </div>
         </div>
@@ -85,15 +105,14 @@
     <div id="view-creator" class="hidden">
         <h2>Konfiguracja Gry</h2>
         <div style="text-align: left;">
-            <label>Autoryzacja graczy:</label>
+            <label>Autoryzacja:</label>
             <select id="newAuthType">
-                <option value="name">Tylko Imię (Szybka gra)</option>
-                <option value="email">Wymagany Email</option>
-                <option value="google">Logowanie Google (Bezpieczne)</option>
+                <option value="name">Tylko Imię</option>
+                <option value="email">Email</option>
+                <option value="google">Google</option>
             </select>
-            <label>Limit losowań na osobę:</label>
+            <label>Limit losowań:</label>
             <input type="number" id="newLimit" value="1" min="1">
-            
             <h3>Nagrody</h3>
             <div id="prizes-list"></div>
             <button onclick="addPrizeField()" class="btn-outline" style="width:100%">+ Dodaj nagrodę</button>
@@ -101,35 +120,63 @@
         <br>
         <div style="display:flex; justify-content:space-between;">
             <button onclick="switchView('view-home')" class="btn-outline">Anuluj</button>
-            <button onclick="createGame()" class="btn-success">🚀 Utwórz</button>
+            <button onclick="createGame()" class="btn-success">Utwórz</button>
         </div>
     </div>
 
     <div id="view-game" class="hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap: wrap; gap: 10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <button onclick="switchView('view-home')" class="btn-outline btn-sm">Wyjdź</button>
-            <div style="background:#eee; padding:5px 10px; border-radius:5px; font-family:monospace; font-size: 0.9rem;">
+            <div style="background:#eee; padding:5px 10px; border-radius:5px; font-size: 0.9rem;">
                 KOD: <span id="displayGameId" style="font-weight:bold;"></span>
-                <button onclick="shareGame()" class="btn-sm btn-primary" style="margin-left:5px;" title="Kopiuj link">🔗</button>
+                <button onclick="shareGame()" class="btn-sm btn-primary" title="Kopiuj">🔗</button>
             </div>
         </div>
 
         <div id="player-auth-form" class="hidden" style="background:#eaf2f8; padding:30px; border-radius:12px;">
             <h3>Dołącz do gry</h3>
-            <p id="auth-msg">Podaj dane aby zakręcić:</p>
-            <input type="text" id="inputName" placeholder="Twoje imię..." class="hidden">
-            <input type="email" id="inputEmail" placeholder="Twój e-mail..." class="hidden">
+            <p>Podaj dane aby sprawdzić wynik lub zakręcić:</p>
+            <input type="text" id="inputName" placeholder="Imię..." class="hidden">
+            <input type="email" id="inputEmail" placeholder="E-mail..." class="hidden">
             <button id="btnGoogleJoin" class="btn-primary hidden">Zaloguj Google</button>
-            <button id="btnSubmitPlayer" class="btn-success hidden" onclick="submitPlayerData()">Dalej</button>
+            <button id="btnSubmitPlayer" class="btn-success hidden" onclick="checkAndPlay()">Dalej</button>
+        </div>
+
+        <div id="already-played-view" class="hidden">
+            <div class="result-card">
+                <h2>Już grałeś! 🎁</h2>
+                <p>Twój wynik to:</p>
+                <h1 id="past-prize-secret" style="font-size: 2.5rem; margin: 10px 0;"></h1>
+                <p>Numer na kole: <b id="past-prize-number"></b></p>
+            </div>
         </div>
 
         <div id="wheel-area" class="hidden">
             <h2 id="status-text" style="color: var(--primary);">Twoja kolej!</h2>
             <div id="canvas-wrapper">
-                <div class="arrow"></div>
-                <canvas id="wheel" width="500" height="500"></canvas>
+                <div class="pointer"></div>
+                <canvas id="canvas" width="434" height="434">
+                    Twoja przeglądarka nie obsługuje Canvas.
+                </canvas>
             </div>
-            <button id="spinBtn" class="btn-primary" style="font-size: 1.3rem; padding: 15px 50px; box-shadow: 0 5px 0 #2980b9;">ZAKRĘĆ KOŁEM!</button>
+            <button id="spinBtn" class="btn-primary" style="font-size: 1.3rem; padding: 15px 50px; margin-top:20px;">ZAKRĘĆ!</button>
+        </div>
+    </div>
+
+    <div id="view-history" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Audyt Gry</h2>
+            <button onclick="switchView('view-home')" class="btn-outline">Zamknij</button>
+        </div>
+        <div style="text-align: left; margin-top: 20px;">
+            <h3>🏆 Zwycięzcy</h3>
+            <div style="overflow-x:auto;">
+                <table class="audit-table"><thead><tr><th>Nr</th><th>Nagroda</th><th>Wygrał</th></tr></thead><tbody id="history-prizes-body"></tbody></table>
+            </div>
+            <h3 style="margin-top: 30px;">📜 Logi</h3>
+            <div style="overflow-x:auto; max-height: 300px; overflow-y: auto; border: 1px solid #eee;">
+                <table class="audit-table"><thead><tr><th>Czas</th><th>Akcja</th><th>Opis</th></tr></thead><tbody id="history-audit-body"></tbody></table>
+            </div>
         </div>
     </div>
 
@@ -138,8 +185,8 @@
 
 <div id="custom-modal" class="modal-overlay">
     <div class="modal-content">
-        <div class="modal-title" id="modal-title">Tytuł</div>
-        <div class="modal-body" id="modal-body">Treść komunikatu...</div>
+        <div class="modal-title" id="modal-title">Info</div>
+        <div class="modal-body" id="modal-body">...</div>
         <button onclick="closeModal()" class="btn-primary">OK</button>
     </div>
 </div>
@@ -148,8 +195,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-    
-    // ✅ IMPORTUJEMY KONFIGURACJĘ (Upewnij się że plik config.js istnieje!)
     import { firebaseConfig, API_URL } from './config.js';
 
     const app = initializeApp(firebaseConfig);
@@ -160,154 +205,116 @@
     let playerToken = null;
     let currentGameId = null;
     let playerData = {};
-    let currentUser = null;
+    let theWheel = null; // Obiekt Winwheel
+    let prizesArr = []; // Lokalne przechowywanie nagród
 
-    // --- SYSTEM MODALI ---
-    window.showModal = (title, body, isError = false) => {
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-title').style.color = isError ? 'var(--danger)' : 'var(--dark)';
-        document.getElementById('modal-body').innerHTML = body;
+    // --- HELPERY UI ---
+    window.showModal = (t, b, err=false) => {
+        document.getElementById('modal-title').innerText = t;
+        document.getElementById('modal-title').style.color = err ? 'var(--danger)' : 'var(--dark)';
+        document.getElementById('modal-body').innerHTML = b;
         document.getElementById('custom-modal').classList.add('active');
     };
     window.closeModal = () => document.getElementById('custom-modal').classList.remove('active');
-
-    // --- NAWIGACJA ---
     window.switchView = (id) => {
-        ['view-home', 'view-creator', 'view-game'].forEach(v => document.getElementById(v).classList.add('hidden'));
+        ['view-home', 'view-creator', 'view-game', 'view-history'].forEach(v => document.getElementById(v).classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
     }
-    window.showCreator = () => { 
-        document.getElementById('prizes-list').innerHTML = ''; // Wyczyść stare
-        addPrizeField(); addPrizeField(); 
-        switchView('view-creator'); 
-    }
 
-    // --- LOGOWANIE ADMINA ---
+    // --- ADMIN ---
     document.getElementById('homeLoginBtn').addEventListener('click', () => signInWithPopup(auth, provider));
-    
     onAuthStateChanged(auth, async (user) => {
-        currentUser = user;
         if (user) {
             document.getElementById('admin-logged-out').classList.add('hidden');
             document.getElementById('admin-logged-in').classList.remove('hidden');
             document.getElementById('adminName').innerText = user.displayName;
             playerToken = await user.getIdToken();
-            loadMyGames(); // Ładujemy dashboard po zalogowaniu
+            loadMyGames();
         } else {
             document.getElementById('admin-logged-in').classList.add('hidden');
             document.getElementById('admin-logged-out').classList.remove('hidden');
         }
     });
 
-    // --- DASHBOARD ADMINA (Lista Gier) ---
     async function loadMyGames() {
         const list = document.getElementById('my-games-list');
-        list.innerHTML = '<p style="color:#777;">Pobieranie danych...</p>';
+        list.innerHTML = 'Ładowanie...';
         try {
-            const res = await fetch(`${API_URL}/api/my-games`, {
-                headers: { 'Authorization': `Bearer ${playerToken}` }
-            });
+            const res = await fetch(`${API_URL}/api/my-games`, { headers: { 'Authorization': `Bearer ${playerToken}` } });
             const data = await res.json();
-            
-            if (!data.games || data.games.length === 0) {
-                list.innerHTML = '<p>Nie masz jeszcze żadnych gier.</p>';
-                return;
-            }
-
+            if (!data.games || !data.games.length) { list.innerHTML = 'Brak gier.'; return; }
             list.innerHTML = '';
             data.games.forEach(g => {
-                const date = new Date(g.createdAt).toLocaleDateString();
                 const div = document.createElement('div');
                 div.className = 'game-item';
                 div.innerHTML = `
-                    <div class="game-info">
-                        <strong>${g.id}</strong> <br> <span style="font-size:0.85rem; color:#777;">${date} • Nagród: ${g.prizesCount}</span>
-                    </div>
+                    <div class="game-info"><strong>${g.id}</strong><br><small>${new Date(g.createdAt).toLocaleDateString()}</small></div>
                     <div class="game-actions">
-                        <button onclick="joinGame('${g.id}')" class="btn-success btn-sm">Otwórz</button>
+                        <button onclick="joinGame('${g.id}')" class="btn-success btn-sm">Graj</button>
+                        <button onclick="showHistory('${g.id}')" class="btn-warning btn-sm">Audyt</button>
                         <button onclick="copyLink('${g.id}')" class="btn-outline btn-sm">Link</button>
-                        <button onclick="deleteGame('${g.id}')" class="btn-danger btn-sm" title="Usuń grę">🗑️</button>
-                    </div>
-                `;
+                        <button onclick="deleteGame('${g.id}')" class="btn-danger btn-sm">🗑️</button>
+                    </div>`;
                 list.appendChild(div);
             });
-        } catch(e) { list.innerHTML = '<p style="color:red">Błąd ładowania gier</p>'; }
+        } catch(e) { list.innerHTML = 'Błąd pobierania.'; }
     }
 
-    // --- USUWANIE GRY ---
-    window.deleteGame = async (gameId) => {
-        if (!confirm(`⚠️ Czy na pewno usunąć grę ${gameId}?\n\nTej operacji nie można cofnąć.`)) return;
-
+    window.deleteGame = async (id) => {
+        if(!confirm("Usunąć?")) return;
+        await fetch(`${API_URL}/api/game/${id}`,{method:'DELETE',headers:{'Authorization':`Bearer ${playerToken}`}});
+        loadMyGames();
+    }
+    
+    // --- KREATOR ---
+    window.showCreator = () => { document.getElementById('prizes-list').innerHTML=''; addPrizeField(); addPrizeField(); switchView('view-creator'); }
+    window.addPrizeField = () => {
+        const d = document.createElement('div'); d.style="display:flex;gap:5px;margin-bottom:5px;";
+        d.innerHTML=`<input class="p-num" style="width:30%" placeholder="Nr"><input class="p-sec" placeholder="Nagroda">`;
+        document.getElementById('prizes-list').appendChild(d);
+    }
+    window.createGame = async () => {
+        const prizes={}; document.querySelectorAll('.p-num').forEach((el,i)=>{ 
+            const n=el.value, s=document.querySelectorAll('.p-sec')[i].value;
+            if(n&&s) prizes[`p_${i}`]={number:n, secret:s, wonBy:null};
+        });
+        if(Object.keys(prizes).length<2) return showModal("Błąd","Min 2 nagrody");
+        const config={authType:document.getElementById('newAuthType').value, spinLimit:document.getElementById('newLimit').value};
         try {
-            const res = await fetch(`${API_URL}/api/game/${gameId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${playerToken}`, 'Content-Type': 'application/json' }
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                showModal("Sukces", "Gra została usunięta.");
-                loadMyGames();
-            } else {
-                showModal("Błąd", data.error, true);
-            }
-        } catch (e) { showModal("Błąd", "Nie udało się połączyć z serwerem.", true); }
+            const res=await fetch(`${API_URL}/api/create-game`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${playerToken}`},body:JSON.stringify({config,prizes})});
+            const d=await res.json();
+            if(d.success) { showModal("Sukces",`KOD: ${d.gameId}`); loadMyGames(); switchView('view-home'); }
+        } catch(e){ showModal("Błąd","Sieć"); }
     }
 
-    // --- LINKI I UDOSTĘPNIANIE ---
-    window.copyLink = (id) => {
-        const url = `${window.location.origin}${window.location.pathname}?game=${id}`;
-        navigator.clipboard.writeText(url);
-        showModal('Skopiowano!', 'Link do gry w schowku.');
-    }
-    window.shareGame = () => copyLink(currentGameId);
-
-    // AUTO-JOIN Z URL
-    window.onload = () => {
-        const params = new URLSearchParams(window.location.search);
-        const gameParam = params.get('game');
-        if(gameParam) {
-            document.getElementById('joinGameId').value = gameParam;
-            joinGame(gameParam);
-        }
-    }
-
-    // --- DOŁĄCZANIE DO GRY ---
+    // --- LOGIKA GRY I WINWHEEL ---
     window.joinGame = async (overrideId) => {
         const id = (typeof overrideId === 'string' ? overrideId : document.getElementById('joinGameId').value).trim().toUpperCase();
-        if(!id) return showModal("Błąd", "Wpisz kod gry!", true);
-        
+        if(!id) return showModal("Błąd", "Wpisz kod!");
         try {
             const res = await fetch(`${API_URL}/api/game/${id}/meta`);
-            if(!res.ok) throw new Error("Nie znaleziono gry.");
+            if(!res.ok) throw new Error("Brak gry");
             const data = await res.json();
             currentGameId = id;
-            setupGameInterface(id, data.config);
+            setupAuth(id, data.config);
             switchView('view-game');
         } catch(e) { showModal("Błąd", e.message, true); }
     };
 
-    function setupGameInterface(id, config) {
+    function setupAuth(id, config) {
         document.getElementById('displayGameId').innerText = id;
-        const form = document.getElementById('player-auth-form');
-        const wheelArea = document.getElementById('wheel-area');
-        
-        // Reset
-        form.classList.add('hidden');
-        wheelArea.classList.add('hidden');
-        ['inputName', 'inputEmail', 'btnGoogleJoin', 'btnSubmitPlayer'].forEach(i => document.getElementById(i).classList.add('hidden'));
+        ['player-auth-form','wheel-area','already-played-view'].forEach(i=>document.getElementById(i).classList.add('hidden'));
+        ['inputName','inputEmail','btnGoogleJoin','btnSubmitPlayer'].forEach(i=>document.getElementById(i).classList.add('hidden'));
 
-        // Konfiguracja widoku
-        form.classList.remove('hidden');
+        document.getElementById('player-auth-form').classList.remove('hidden');
         if(config.authType === 'google') {
-            const btn = document.getElementById('btnGoogleJoin');
-            btn.classList.remove('hidden');
-            btn.onclick = async () => {
+            document.getElementById('btnGoogleJoin').classList.remove('hidden');
+            document.getElementById('btnGoogleJoin').onclick = async () => {
                 try {
                     const res = await signInWithPopup(auth, provider);
                     playerToken = await res.user.getIdToken();
-                    startGameVisuals(id);
-                } catch(e) { showModal("Błąd", e.message, true); }
+                    checkAndPlay();
+                } catch(e) { showModal("Błąd", e.message); }
             };
         } else {
             document.getElementById('btnSubmitPlayer').classList.remove('hidden');
@@ -316,72 +323,65 @@
         }
     }
 
-    window.submitPlayerData = () => {
-        playerData = { 
-            name: document.getElementById('inputName').value, 
-            email: document.getElementById('inputEmail').value 
-        };
-        startGameVisuals(currentGameId);
-    };
-
-    function startGameVisuals(gameId) {
-        document.getElementById('player-auth-form').classList.add('hidden');
-        document.getElementById('wheel-area').classList.remove('hidden');
-        listenToGameEvents(gameId);
-    }
-
-    // --- KREATOR GRY ---
-    window.addPrizeField = () => {
-        const div = document.createElement('div');
-        div.className = 'prize-row';
-        div.style = "display:flex; gap:5px; margin-bottom:5px;";
-        div.innerHTML = `<input placeholder="Na kole (np. 1)" class="p-num" style="width:30%"><input placeholder="Nagroda (np. Laptop)" class="p-sec">`;
-        document.getElementById('prizes-list').appendChild(div);
-    };
-
-    window.createGame = async () => {
-        const prizes = {};
-        document.querySelectorAll('.prize-row').forEach((row, i) => {
-            const num = row.querySelector('.p-num').value.trim();
-            const sec = row.querySelector('.p-sec').value.trim();
-            if(num && sec) prizes[`prize_${i}`] = { number: num, secret: sec, wonBy: null };
-        });
+    window.checkAndPlay = async () => {
+        playerData = { name: document.getElementById('inputName').value, email: document.getElementById('inputEmail').value };
+        const headers = { 'Content-Type': 'application/json' };
+        if(playerToken) headers['Authorization'] = `Bearer ${playerToken}`;
         
-        if(Object.keys(prizes).length < 2) return showModal("Uwaga", "Dodaj co najmniej 2 nagrody!", true);
-
-        const config = { authType: document.getElementById('newAuthType').value, spinLimit: parseInt(document.getElementById('newLimit').value) };
-
         try {
-            const res = await fetch(`${API_URL}/api/create-game`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${playerToken}` },
-                body: JSON.stringify({ config, prizes })
+            const res = await fetch(`${API_URL}/api/game/${currentGameId}/my-result`, {
+                method: 'POST', headers, body: JSON.stringify({ gameId: currentGameId, userData: playerData })
             });
             const data = await res.json();
-            if(data.success) {
-                showModal("Sukces", `Gra utworzona!<br><b>KOD: ${data.gameId}</b>`);
-                loadMyGames(); // Odśwież listę
-                switchView('view-home');
-            } else { showModal("Błąd", data.error, true); }
-        } catch(e) { showModal("Błąd", "Błąd połączenia", true); }
+            document.getElementById('player-auth-form').classList.add('hidden');
+
+            if(data.hasPlayed) {
+                document.getElementById('already-played-view').classList.remove('hidden');
+                document.getElementById('past-prize-secret').innerText = data.prize.secret;
+                document.getElementById('past-prize-number').innerText = data.prize.number;
+            } else {
+                document.getElementById('wheel-area').classList.remove('hidden');
+                initWinwheel(currentGameId); // Inicjalizacja biblioteki
+            }
+        } catch(e) { showModal("Błąd", "Nie udało się sprawdzić statusu"); }
     };
 
-    // --- LOGIKA KOŁA (KOLORY + TEKST) ---
-    let prizesArr = [];
-    let currentRotation = 0;
-    const canvas = document.getElementById('wheel');
-    const ctx = canvas.getContext('2d');
-    
-    // Paleta kolorów (Vibrant)
-    const COLORS = ['#3498db', '#9b59b6', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#34495e'];
-
-    function listenToGameEvents(gameId) {
+    // --- INICJALIZACJA WINWHEEL.JS ---
+    function initWinwheel(gameId) {
+        // Nasłuchujemy nagród z Firebase, żeby zbudować segmenty koła
         onValue(ref(db, `games/${gameId}/prizes`), (snap) => {
             prizesArr = [];
             if(snap.exists()) snap.forEach(c => prizesArr.push({ ...c.val(), id: c.key }));
-            drawWheel();
+            
+            // Konwersja na format Winwheel
+            const segments = prizesArr.map((p, index) => ({
+                'fillStyle' : p.wonBy ? '#bdc3c7' : getRandomColor(index), // Szary jak zajęte
+                'text'      : p.number,
+                'textFontSize' : 24,
+                'textFillStyle' : '#ffffff'
+            }));
+
+            // Tworzymy obiekt koła
+            if(theWheel) { theWheel.clearCanvas(); } // Czyścimy stare
+            
+            theWheel = new Winwheel({
+                'numSegments'  : prizesArr.length,
+                'outerRadius'  : 212,
+                'textFontSize' : 28,
+                'segments'     : segments,
+                'animation' : {
+                    'type'     : 'spinToStop',
+                    'duration' : 5,
+                    'spins'    : 8,
+                    'callbackFinished' : alertPrize
+                }
+            });
+            
+            // Rysujemy
+            theWheel.draw();
         });
-        
+
+        // Nasłuchiwanie STATE, żeby animować (Synchronizacja)
         onValue(ref(db, `games/${gameId}/gameState`), (snap) => {
             const state = snap.val();
             const btn = document.getElementById('spinBtn');
@@ -391,78 +391,74 @@
                 btn.disabled = true;
                 status.innerText = `Kręci: ${state.spinnerName}...`;
                 
-                const idx = prizesArr.findIndex(p => p.id === state.prizeId);
-                if(idx > -1) {
-                    const arc = 360 / prizesArr.length;
-                    const target = 360 - (idx * arc) - (arc/2) + 270; 
-                    const rot = currentRotation + 1800 + (target - (currentRotation%360)); 
+                // Znajdź indeks nagrody, która wygrała
+                const winningSegmentIndex = prizesArr.findIndex(p => p.id === state.prizeId) + 1; // Winwheel liczy od 1
+                
+                if(winningSegmentIndex > 0) {
+                    // Oblicz kąt stopu dla tego segmentu
+                    const stopAt = theWheel.getRandomForSegment(winningSegmentIndex);
                     
-                    canvas.style.transform = `rotate(${rot}deg)`;
-                    canvas.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)";
-                    currentRotation = rot;
+                    // Reset i start animacji
+                    theWheel.stopAnimation(false);
+                    theWheel.rotationAngle = 0;
+                    theWheel.animation.stopAngle = stopAt;
+                    theWheel.startAnimation();
                 }
             } else {
+                // Koniec kręcenia (reset po 5s przez backend)
                 btn.disabled = false;
                 status.innerText = "Twoja kolej!";
             }
         });
     }
 
-    function drawWheel() {
-        const count = prizesArr.length;
-        if(count === 0) return;
-        
-        const arc = (2 * Math.PI) / count;
-        const radius = 250;
-        ctx.clearRect(0,0,500,500);
-        
-        prizesArr.forEach((p, i) => {
-            const angle = i * arc;
-            
-            ctx.beginPath();
-            ctx.fillStyle = p.wonBy ? '#bdc3c7' : COLORS[i % COLORS.length];
-            ctx.moveTo(radius, radius);
-            ctx.arc(radius, radius, radius, angle, angle + arc);
-            ctx.fill();
-            ctx.stroke(); 
-            
-            ctx.save();
-            ctx.translate(radius, radius);
-            ctx.rotate(angle + arc / 2);
-            ctx.textAlign = "right";
-            ctx.fillStyle = "white";
-            ctx.font = "bold 28px Segoe UI";
-            ctx.shadowColor = "rgba(0,0,0,0.5)";
-            ctx.shadowBlur = 4;
-            ctx.fillText(p.number, radius - 30, 10);
-            ctx.restore();
-        });
+    function alertPrize(indicatedSegment) {
+        // Callback po zakończeniu animacji (tylko lokalnie, ale wszyscy widzą to samo)
+        // Prawdziwy alert pokaże tylko ten, kto kliknął (poniżej w onclick)
     }
 
-    // --- KLIKNIĘCIE SPIN ---
-    document.getElementById('spinBtn').addEventListener('click', async () => {
-        const headers = { 'Content-Type': 'application/json' };
-        if(playerToken) headers['Authorization'] = `Bearer ${playerToken}`;
+    // --- AKCJA SPIN ---
+    document.getElementById('spinBtn').onclick = async () => {
+        const h={'Content-Type':'application/json'}; if(playerToken) h['Authorization']=`Bearer ${playerToken}`;
         
         try {
-            const res = await fetch(`${API_URL}/api/spin`, { 
-                method: 'POST', headers, body: JSON.stringify({ gameId: currentGameId, userData: playerData }) 
+            const res = await fetch(`${API_URL}/api/spin`, {
+                method: 'POST', headers: h, body: JSON.stringify({gameId:currentGameId, userData:playerData})
             });
             const data = await res.json();
             
-            if(!data.success) {
+            if(!res.ok) {
+                // Obsługa błędu 403 i innych
                 if(data.code === 'LIMIT_REACHED') {
-                    showModal("Koniec Gry", "Wykorzystałeś już swój limit losowań! 😢", true);
+                    showModal("Info", "Wykorzystałeś już limit losowań!", true);
                 } else {
-                    showModal("Błąd", data.error, true);
+                    showModal("Błąd", data.error || "Wystąpił błąd", true);
                 }
             } else {
+                // Sukces - Animacja ruszy sama przez listener Firebase
+                // My tylko pokazujemy modal po czasie
                 setTimeout(() => {
-                    showModal("🎉 GRATULACJE!", `Wylosowałeś numer: <b>${data.number}</b><br><br>NAGRODA:<br><h1>${data.secretPrize}</h1>`);
-                }, 5000);
+                    showModal("🎉 GRATULACJE!", `Wylosowałeś: <b>${data.number}</b><br><br>NAGRODA:<br><h1>${data.secretPrize}</h1>`);
+                }, 5500); // 5.5s (animacja trwa 5s)
             }
         } catch(e) { showModal("Błąd", "Problem z połączeniem", true); }
-    });
+    }
+
+    // --- KOLORY I HISTORIA ---
+    function getRandomColor(i) { const c=['#3498db','#9b59b6','#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c']; return c[i%c.length]; }
+    window.copyLink=(id)=>{navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?game=${id}`);showModal("OK","Link skopiowany")};
+    window.shareGame=()=>window.copyLink(currentGameId);
+    window.showHistory=async(id)=>{
+        window.switchView('view-history'); 
+        document.getElementById('history-prizes-body').innerHTML='Trwa ładowanie...';
+        const r=await fetch(`${API_URL}/api/game/${id}/admin-details`,{headers:{'Authorization':`Bearer ${playerToken}`}});
+        const d=await r.json();
+        const pB=document.getElementById('history-prizes-body'); pB.innerHTML='';
+        const aB=document.getElementById('history-audit-body'); aB.innerHTML='';
+        d.prizes.filter(p=>p.wonBy).forEach(p=>pB.innerHTML+=`<tr><td>${p.number}</td><td>${p.secret}</td><td>${p.wonByName}</td></tr>`);
+        d.audit.forEach(a=>aB.innerHTML+=`<tr><td>${new Date(a.timestamp).toLocaleTimeString()}</td><td>${a.action}</td><td>${a.description}</td></tr>`);
+    };
+    window.onload=()=>{ const p=new URLSearchParams(window.location.search).get('game'); if(p){ document.getElementById('joinGameId').value=p; joinGame(p); }};
 </script>
 </body>
 </html>
